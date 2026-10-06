@@ -1,0 +1,17 @@
+services:
+  cctv:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+    volumes:
+      - cctv-data:/data
+    tmpfs:
+      - /tmp   # segmen HLS sementara (buffer bergulir, bukan rekaman)
+    restart: unless-stopped
+volumes:
+  cctv-data:
