@@ -60,8 +60,8 @@ npm run release     # = deploy/release.sh: npm ci -> test -> build -> commit ser
 ### 2. Setup pertama di STB
 ```bash
 sudo apt install -y ffmpeg            # Node >= 20.6 dan pm2 juga dibutuhkan (npm i -g pm2)
-git clone https://github.com/sidrive/zknet-cctv-stream.git /opt/zknet-cctv-stream
-cd /opt/zknet-cctv-stream && git checkout <branch-yang-dipublish>
+git clone -b main https://github.com/sidrive/zknet-cctv-stream.git /opt/zknet-cctv-stream
+cd /opt/zknet-cctv-stream
 
 ss -tulpn | grep LISTEN               # pilih port yang benar-benar kosong
 cp .env.example .env && nano .env
