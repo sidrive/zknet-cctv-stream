@@ -35,6 +35,13 @@ code { background: var(--panel-2); padding: .1rem .35rem; border-radius: 4px; }
 .crumbs { margin-bottom: 8px; }
 
 /* Public dashboard */
+/* Beranda dirancang bertema gelap: kunci palet di sini agar tetap terbaca di perangkat bertema terang. */
+.dashboard-shell {
+  --bg: #06172d; --panel: #102d50; --panel-2: #173b67; --line: #28517d;
+  --text: #f5f9ff; --muted: #abc2db; --accent: #16a9ff; --accent-ink: #041b35;
+  --danger: #ff6570; --warn: #ffd462; --good: #33e5a0; --purple: #9578ff;
+  color-scheme: dark; color: var(--text);
+}
 .dashboard-shell { min-height: 100vh; display: flex; background: radial-gradient(circle at 78% 0%, rgb(20 73 128 / .3), transparent 34%), var(--bg); }
 .dashboard-sidebar { width: 220px; flex: 0 0 220px; display: flex; flex-direction: column; padding: 24px 10px 16px; background: linear-gradient(180deg, #092850 0%, #071d3b 100%); border-right: 1px solid rgb(71 134 194 / .22); }
 .brand-mark { display: flex; flex-direction: column; align-items: center; gap: 0; color: #fff; text-decoration: none; padding: 0 8px 28px; }

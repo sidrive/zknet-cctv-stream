@@ -56,10 +56,6 @@ export default function Home() {
           <a className="dashboard-nav-item" href="#status"><span aria-hidden>{icon.network}</span>Status Jaringan</a>
           <Link className="dashboard-nav-item" to="/admin"><span aria-hidden>{icon.settings}</span>Pengaturan</Link>
         </nav>
-
-        <a className="dashboard-promo" href="https://wa.me/6285640420791" target="_blank" rel="noreferrer" aria-label="Hubungi ZKNet untuk memasang internet">
-          <img src="/zknet-promo-internet.png" alt="Pasang Internet ZKNet Sekarang. Hubungi Kami 085640420791." />
-        </a>
       </aside>
 
       <main className="dashboard-main" id="dashboard">
