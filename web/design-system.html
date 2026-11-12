@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZKNet Design System</title>
+<link rel="stylesheet" href="zknet-ds.css">
+<style>
+  /* Hanya untuk halaman dokumentasi ini, bukan bagian dari DS */
+  .doc { max-width: 1180px; margin: 0 auto; padding: 40px 24px 80px; display: grid; gap: 40px; }
+  .doc h2 { margin: 0 0 16px; font-size: 1.5rem; }
+  .doc section { display: grid; gap: 16px; }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .sw { border-radius: 12px; border: 1px solid var(--zk-border); overflow: hidden; background: var(--zk-surface); }
+  .sw i { display: block; height: 56px; }
+  .sw div { padding: 8px 10px; font-size: 12px; line-height: 1.35; }
+  .sw code { color: var(--zk-text-muted); }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .demo { border: 1px dashed var(--zk-border-strong); border-radius: 16px; padding: 20px; }
+  .radius-box { width: 96px; height: 64px; background: var(--zk-surface-3); border: 1px solid var(--zk-border-strong); display: grid; place-items: center; font-size: 12px; }
+  .scale div { display: flex; align-items: baseline; gap: 16px; padding: 6px 0; border-bottom: 1px solid var(--zk-border); }
+  .scale small { width: 130px; color: var(--zk-text-subtle); flex: none; }
+  .dash { border: 1px solid var(--zk-border); border-radius: 20px; overflow: hidden; }
+  .dash .zk-app { min-height: 0; }
+  .dash .zk-sidebar { position: static; height: auto; }
+  .ph1 { background-image: linear-gradient(135deg,#3a6aa5,#6e8f6a); }
+  .ph2 { background-image: linear-gradient(135deg,#40607f,#8a7f66); }
+  .ph3 { background-image: linear-gradient(135deg,#5b7e96,#4c6b4a); }
+  .ph4 { background-image: linear-gradient(135deg,#6f6f6f,#aa9a74); }
+</style>
+</head>
+<body class="zk">
+
+<!-- Sprite ikon (stroke 1.75, 24px) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><circle cx="12" cy="10" r="2.5"/><path d="M8 20h8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.5c3 0 6 1.5 6 5.5"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/></symbol>
+  <symbol id="i-signal" viewBox="0 0 24 24"><path d="M5 20v-5M10 20v-9M15 20v-13M20 20V4"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 1112 0v6l1.5 2h-15zM10 21h4"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-radio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M8 8a5.7 5.7 0 000 8M16 8a5.7 5.7 0 010 8M5 5a10 10 0 000 14M19 5a10 10 0 010 14"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></symbol>
+</svg>
+
+<main class="doc">
+
+  <header>
+    <h1 class="zk-h1">ZKNet Design System</h1>
+    <p class="zk-text-muted" style="max-width:60ch">Token dan komponen untuk dashboard pemantauan CCTV desa. Dark theme, satu file CSS (<code>zknet-ds.css</code>), tanpa dependensi framework.</p>
+  </header>
+
+  <!-- ============ WARNA ============ -->
+  <section>
+    <h2>Warna</h2>
+    <div class="swatches" id="swatches"></div>
+  </section>
+
+  <!-- ============ TIPOGRAFI ============ -->
+  <section>
+    <h2>Tipografi</h2>
+    <div class="zk-panel scale">
+      <div><small>2xl / 800 · 32px</small><span style="font-size:var(--zk-fs-2xl);font-weight:800">Pantau Lingkungan Desa</span></div>
+      <div><small>xl / 800 · 24px</small><span style="font-size:var(--zk-fs-xl);font-weight:800">150 kamera</span></div>
+      <div><small>lg / 700 · 18px</small><span style="font-size:var(--zk-fs-lg);font-weight:700">Daftar Cluster</span></div>
+      <div><small>md / 400 · 15px</small><span>Pemantauan kamera CCTV publik di wilayah layanan ZKNet.</span></div>
+      <div><small>sm / 500 · 13px</small><span class="zk-text-sm zk-text-muted">Kamera CCTV publik Pemerintah Kabupaten Bantul.</span></div>
+      <div><small>xs / 600 · 12px</small><span style="font-size:var(--zk-fs-xs);font-weight:600">Online</span></div>
+    </div>
+    <p class="zk-text-sm zk-text-subtle">Font: Plus Jakarta Sans (400–800). Fallback: Segoe UI, system-ui.</p>
+  </section>
+
+  <!-- ============ RADIUS & SPASI ============ -->
+  <section>
+    <h2>Radius dan spasi</h2>
+    <div class="row">
+      <div class="radius-box" style="border-radius:var(--zk-r-sm)">sm 8</div>
+      <div class="radius-box" style="border-radius:var(--zk-r-md)">md 12</div>
+      <div class="radius-box" style="border-radius:var(--zk-r-lg)">lg 16</div>
+      <div class="radius-box" style="border-radius:var(--zk-r-xl)">xl 20</div>
+      <div class="radius-box" style="border-radius:var(--zk-r-pill)">pill</div>
+    </div>
+    <p class="zk-text-sm zk-text-muted">Skala spasi 4px: 4, 8, 12, 16, 20, 24, 32, 40. Jarak antar kartu di grid memakai <code>--zk-gap</code> (16px).</p>
+  </section>
+
+  <!-- ============ KOMPONEN ============ -->
+  <section>
+    <h2>Tombol, badge, chip</h2>
+    <div class="demo row">
+      <button class="zk-btn zk-btn--primary">Simpan</button>
+      <button class="zk-btn zk-btn--ghost">Batal</button>
+      <button class="zk-btn zk-btn--whatsapp">Hubungi kami</button>
+      <button class="zk-btn zk-btn--primary zk-btn--sm">Kecil</button>
+    </div>
+    <div class="demo row">
+      <span class="zk-badge zk-badge--online">Online</span>
+      <span class="zk-badge zk-badge--offline">Offline</span>
+      <span class="zk-badge zk-badge--locked"><svg class="zk-icon" style="width:12px;height:12px"><use href="#i-lock"/></svg>Berkode</span>
+      <span class="zk-badge zk-badge--info">Info</span>
+      <span class="zk-badge zk-badge--live">LIVE</span>
+      <span class="zk-chip zk-chip--blue"><svg class="zk-icon"><use href="#i-shield"/></svg>Keamanan Lingkungan</span>
+      <span class="zk-chip zk-chip--green"><svg class="zk-icon"><use href="#i-users"/></svg>Kenyamanan Warga</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Kartu statistik</h2>
+    <div class="zk-grid-stats">
+      <div class="zk-stat zk-stat--primary"><div class="zk-stat__icon"><svg class="zk-icon"><use href="#i-cam"/></svg></div><div><div class="zk-stat__label">Total Kamera</div><div class="zk-stat__value">150</div></div></div>
+      <div class="zk-stat zk-stat--success"><div class="zk-stat__icon"><svg class="zk-icon"><use href="#i-radio"/></svg></div><div><div class="zk-stat__label">Online</div><div class="zk-stat__value">148</div></div></div>
+      <div class="zk-stat zk-stat--danger"><div class="zk-stat__icon"><svg class="zk-icon"><use href="#i-radio"/></svg></div><div><div class="zk-stat__label">Offline</div><div class="zk-stat__value">2</div></div></div>
+      <div class="zk-stat zk-stat--violet"><div class="zk-stat__icon"><svg class="zk-icon"><use href="#i-users"/></svg></div><div><div class="zk-stat__label">Total Cluster</div><div class="zk-stat__value">3</div></div></div>
+      <div class="zk-stat zk-stat--status"><div style="display:flex;gap:12px;align-items:center"><span class="zk-status-dot"></span><div><div class="zk-text-sm">Layanan ZKNet</div><div style="color:var(--zk-success);font-weight:700">Normal</div></div></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Contoh halaman: dashboard</h2>
+    <div class="dash">
+      <div class="zk-app">
+        <aside class="zk-sidebar">
+          <div class="zk-brand"><div class="zk-brand__name">zk<b>net</b></div><div class="zk-brand__tag">Internet untuk Desa</div></div>
+          <nav class="zk-nav" aria-label="Utama">
+            <a class="zk-nav__item is-active" href="#" aria-current="page"><svg class="zk-icon"><use href="#i-home"/></svg>Dashboard</a>
+            <a class="zk-nav__item" href="#"><svg class="zk-icon"><use href="#i-cam"/></svg>CCTV Publik</a>
+            <a class="zk-nav__item" href="#"><svg class="zk-icon"><use href="#i-users"/></svg>Cluster</a>
+            <a class="zk-nav__item" href="#"><svg class="zk-icon"><use href="#i-map"/></svg>Peta Lokasi</a>
+            <a class="zk-nav__item" href="#"><svg class="zk-icon"><use href="#i-signal"/></svg>Status Jaringan</a>
+            <a class="zk-nav__item" href="#"><svg class="zk-icon"><use href="#i-gear"/></svg>Pengaturan</a>
+          </nav>
+          <div class="zk-sidebar__footer zk-promo-side">
+            <h3 class="zk-promo-side__title">Pasang Internet ZKNet</h3>
+            <p class="zk-text-sm" style="margin:0">Internet stabil, buat kebutuhan rumah dan usaha Anda</p>
+            <a class="zk-btn zk-btn--whatsapp zk-btn--sm" href="#">085640420791</a>
+          </div>
+        </aside>
+
+        <div class="zk-main">
+          <header class="zk-topbar">
+            <div class="zk-topbar__title">
+              <h1>ZKNet CCTV</h1>
+              <p>Pemantauan kamera CCTV publik di wilayah layanan ZKNet.</p>
+            </div>
+            <label class="zk-search"><svg class="zk-icon"><use href="#i-search"/></svg><input placeholder="Cari kamera, lokasi, atau cluster…"><span class="zk-kbd">⌘ K</span></label>
+            <button class="zk-icon-btn" aria-label="Notifikasi"><svg class="zk-icon"><use href="#i-bell"/></svg><span class="zk-dot"></span></button>
+            <div class="zk-avatar"><svg class="zk-icon"><use href="#i-user"/></svg></div>
+          </header>
+
+          <section class="zk-hero">
+            <h2 class="zk-hero__title">Pantau Lingkungan Desa Lebih Aman dan Nyaman</h2>
+            <p class="zk-hero__sub">CCTV publik untuk keamanan, ketertiban, dan kenyamanan bersama.</p>
+            <div class="zk-hero__chips">
+              <span class="zk-chip zk-chip--blue"><svg class="zk-icon"><use href="#i-shield"/></svg>Keamanan Lingkungan</span>
+              <span class="zk-chip zk-chip--blue"><svg class="zk-icon"><use href="#i-users"/></svg>Kenyamanan Warga</span>
+              <span class="zk-chip zk-chip--green"><svg class="zk-icon"><use href="#i-home"/></svg>Desa Makin Tertata</span>
+            </div>
+          </section>
+
+          <div class="zk-grid-stats">
+            <div class="zk-stat zk-stat--primary"><div class="zk-stat__icon"><svg class="zk-icon"><use href="#i-cam"/></svg></div><div><div class="zk-stat__label">Total Kamera</div><div className="zk-stat__value">150</div></div></div>
+            <div class="zk-stat zk-stat--success"><div class="zk-stat__icon"><svg class="zk-icon"><use href="#i-radio"/></svg></div><div><div class="zk-stat__label">Online</div><div class="zk-stat__value">148</div></div></div>
+            <div class="zk-stat zk-stat--danger"><div class="zk-stat__icon"><svg class="zk-icon"><use href="#i-radio"/></svg></div><div><div class="zk-stat__label">Offline</div><div class="zk-stat__value">2</div></div></div>
+            <div class="zk-stat zk-stat--violet"><div class="zk-stat__icon"><svg class="zk-icon"><use href="#i-users"/></svg></div><div><div class="zk-stat__label">Total Cluster</div><div class="zk-stat__value">3</div></div></div>
+            <div class="zk-stat zk-stat--status"><div style="display:flex;gap:12px;align-items:center"><span class="zk-status-dot"></span><div><div class="zk-text-sm">Layanan ZKNet</div><div style="color:var(--zk-success);font-weight:700">Normal</div></div></div></div>
+          </div>
+
+          <div class="zk-grid-split">
+            <div class="zk-stack">
+              <section class="zk-panel">
+                <div class="zk-panel__head"><h2 class="zk-h2"><svg class="zk-icon"><use href="#i-users"/></svg>Daftar Cluster</h2><a class="zk-link" href="#">Lihat Semua</a></div>
+                <div class="zk-stack">
+                  <article class="zk-list-item"><div class="zk-list-item__thumb ph1"></div><div class="zk-list-item__body"><h3 class="zk-list-item__title">CCTV Kabupaten Bantul</h3><p class="zk-list-item__desc">Kamera CCTV publik Pemerintah Kabupaten Bantul.<br>41 kamera</p></div><div class="zk-list-item__aside"><span class="zk-badge zk-badge--online">Online</span><svg class="zk-icon zk-list-item__chev"><use href="#i-chev"/></svg></div></article>
+                  <article class="zk-list-item"><div class="zk-list-item__thumb ph2"></div><div class="zk-list-item__body"><h3 class="zk-list-item__title">Rumah</h3><p class="zk-list-item__desc">Rumah ZKNet.<br>1 kamera</p></div><div class="zk-list-item__aside"><span class="zk-badge zk-badge--locked"><svg class="zk-icon" style="width:12px;height:12px"><use href="#i-lock"/></svg>Berkode</span><svg class="zk-icon zk-list-item__chev"><use href="#i-chev"/></svg></div></article>
+                  <article class="zk-list-item"><div class="zk-list-item__thumb ph3"></div><div class="zk-list-item__body"><h3 class="zk-list-item__title">CCTV Kota Yogyakarta</h3><p class="zk-list-item__desc">Kamera CCTV publik Pemerintah Kota Yogyakarta.<br>108 kamera</p></div><div class="zk-list-item__aside"><span class="zk-badge zk-badge--online">Online</span><svg class="zk-icon zk-list-item__chev"><use href="#i-chev"/></svg></div></article>
+                </div>
+              </section>
+              <section class="zk-promo">
+                <div><h3 class="zk-promo__title">Internet Stabil di Rumah &amp; Usaha?</h3><p class="zk-promo__sub">Pasang internet ZKNet sekarang!</p></div>
+                <a class="zk-btn zk-btn--whatsapp" href="#">Hubungi Kami</a>
+              </section>
+            </div>
+
+            <section class="zk-panel">
+              <div class="zk-panel__head">
+                <h2 class="zk-h2"><svg class="zk-icon"><use href="#i-video"/></svg>CCTV Kabupaten Bantul</h2>
+                <div class="zk-panel__tools">
+                  <div class="zk-segmented" role="group" aria-label="Tampilan">
+                    <button aria-pressed="true" aria-label="Grid"><svg class="zk-icon"><use href="#i-grid"/></svg></button>
+                    <button aria-pressed="false" aria-label="Daftar"><svg class="zk-icon"><use href="#i-list"/></svg></button>
+                  </div>
+                  <button class="zk-select">Tampilan 3 × 3 <svg class="zk-icon" style="width:16px;height:16px"><use href="#i-down"/></svg></button>
+                </div>
+              </div>
+              <div class="zk-grid-cams" style="--zk-cols:3">
+                <div class="zk-cam ph1"><span class="zk-badge zk-badge--live">LIVE</span><div class="zk-cam__caption"><svg class="zk-icon" style="width:16px;height:16px"><use href="#i-video"/></svg>Bundaran Srandakan</div></div>
+                <div class="zk-cam ph2"><span class="zk-badge zk-badge--live">LIVE</span><div class="zk-cam__caption"><svg class="zk-icon" style="width:16px;height:16px"><use href="#i-video"/></svg>Bendung Merdiko Niten</div></div>
+                <div class="zk-cam ph3"><span class="zk-badge zk-badge--live">LIVE</span><div class="zk-cam__caption"><svg class="zk-icon" style="width:16px;height:16px"><use href="#i-video"/></svg>Bendung Klegen</div></div>
+                <div class="zk-cam ph4"><span class="zk-badge zk-badge--live">LIVE</span><div class="zk-cam__caption"><svg class="zk-icon" style="width:16px;height:16px"><use href="#i-video"/></svg>Gerbang Pemda II Manding</div></div>
+                <div class="zk-cam ph1 zk-cam--offline"><span class="zk-badge zk-badge--offline">OFFLINE</span><div class="zk-cam__caption"><svg class="zk-icon" style="width:16px;height:16px"><use href="#i-video"/></svg>Contoh kamera offline</div></div>
+                <div class="zk-cam ph3"><span class="zk-badge zk-badge--live">LIVE</span><div class="zk-cam__caption"><svg class="zk-icon" style="width:16px;height:16px"><use href="#i-video"/></svg>Makam Kotagede</div></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  // Render swatch dari token CSS supaya dokumentasi selalu sinkron dengan zknet-ds.css
+  const tokens = [
+    ["bg","Latar halaman"],["bg-deep","Sidebar"],["surface","Panel"],["surface-2","Kartu"],["surface-3","Hover"],
+    ["primary","Primary"],["primary-hi","Primary terang"],["success","Online / sukses"],["danger","Offline / error"],
+    ["violet","Cluster"],["warning","Berkode / peringatan"],["whatsapp","WhatsApp"],["live","Badge LIVE"],
+    ["text","Teks utama"],["text-muted","Teks sekunder"],["text-subtle","Teks tersier"]
+  ];
+  const cs = getComputedStyle(document.documentElement);
+  document.getElementById("swatches").innerHTML = tokens.map(([k, label]) => {
+    const v = cs.getPropertyValue("--zk-" + k).trim();
+    return `<div class="sw"><i style="background:var(--zk-${k})"></i><div><strong>${label}</strong><br><code>--zk-${k}</code><br><code>${v}</code></div></div>`;
+  }).join("");
+</script>
+</body>
+</html>
