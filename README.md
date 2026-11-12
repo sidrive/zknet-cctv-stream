@@ -48,6 +48,78 @@ Data persisten di volume `cctv-data`. Pasang di belakang reverse proxy HTTPS lal
 
 > **Penting saat dipasang di internet:** isi `SETUP_TOKEN` sebelum pertama kali dijalankan agar orang lain tidak bisa membuat admin pertama mendahului Anda.
 
+## Deploy ke STB Armbian (PM2 + Cloudflare Tunnel)
+
+Pola sama dengan app STB lain (`omni-invest-dashboard`, `landingpage-zknet-frontend`): build di luar STB, `dist/` di-commit, STB hanya `git pull`; Node dijaga PM2; domain lewat Cloudflare Tunnel yang sudah ada. Express melayani web + API + stream sekaligus, jadi **tidak perlu container nginx**.
+
+### 1. Rilis (laptop/sandbox)
+```bash
+npm run release     # = deploy/release.sh: npm ci -> test -> build -> commit server/dist + web/dist -> push
+```
+
+### 2. Setup pertama di STB
+```bash
+sudo apt install -y ffmpeg            # Node >= 20.6 dan pm2 juga dibutuhkan (npm i -g pm2)
+git clone https://github.com/sidrive/zknet-cctv-stream.git /opt/zknet-cctv-stream
+cd /opt/zknet-cctv-stream && git checkout <branch-yang-dipublish>
+
+ss -tulpn | grep LISTEN               # pilih port yang benar-benar kosong
+cp .env.example .env && nano .env
+```
+Isi minimal `.env`:
+```ini
+PORT=<port kosong>
+DATA_DIR=/var/lib/zknet-cctv
+STREAM_TMP_DIR=/dev/shm/zknet-cctv    # segmen HLS di RAM, bukan di flash
+COOKIE_SECURE=true
+TRUST_PROXY=true
+SETUP_TOKEN=<acak panjang>
+FFMPEG_IDLE_SECONDS=30
+```
+
+### 3. Pindahkan database yang sudah ada (semua kamera, cluster, admin, pengaturan)
+Di mesin tempat database diisi (`./data/cctv.db` atau `$DATA_DIR`):
+```bash
+npm run db:export -- ./cctv-export.db        # snapshot konsisten, aman walau server sedang jalan
+scp cctv-export.db <user>@<ip-stb>:/tmp/
+```
+Di STB:
+```bash
+/opt/zknet-cctv-stream/deploy/stb-restore-db.sh /tmp/cctv-export.db
+```
+Skrip memvalidasi file (integrity check + jumlah admin/cluster/kamera), menghentikan app, membuat backup `cctv.db.bak-<waktu>` bila sudah ada DB, membersihkan sisa WAL, memasang file (`chmod 600`), lalu menyalakan app. Login admin lama tetap berlaku (secret sesi ikut tersalin). `SETUP_TOKEN` tidak dipakai lagi karena admin sudah ada.
+
+> File database berisi **URL & kredensial kamera** dan hash kode akses. Perlakukan seperti rahasia: transfer lewat `scp`/SSH, hapus `cctv-export.db` dari `/tmp` setelah restore.
+
+### 4. Jalankan
+```bash
+/opt/zknet-cctv-stream/deploy/stb-update.sh   # npm ci (hanya dependency server) + pm2 start + pm2 save + cek /api/health
+pm2 startup                                   # sekali saja, agar hidup lagi setelah reboot (ikuti perintah yang ditampilkan)
+```
+
+### 5. Cloudflare Tunnel
+Di `/etc/cloudflared/config.yml`, **sebelum** catch-all `http_status:404`:
+```yaml
+  - hostname: cctv.domainanda.com
+    service: http://localhost:<PORT>
+```
+```bash
+cloudflared tunnel route dns <tunnel-id> cctv.domainanda.com
+systemctl restart cloudflared
+curl https://cctv.domainanda.com/api/health
+```
+Setelah itu, di panel admin → *Embed & Pengaturan*, isi "Origin yang boleh meng-embed" bila dipakai sebagai mini-app.
+
+### Update berikutnya
+Laptop: `npm run release`. STB: `/opt/zknet-cctv-stream/deploy/stb-update.sh`.
+
+### Catatan khusus STB (S905x)
+* **Jangan centang "Transcode"** pada kamera RTSP: encoding H.264 di CPU STB sangat berat. Kamera H.265 butuh transcode, jadi pakai sumber H.264 (substream) bila ada.
+* Upload ISP = batas jumlah penonton bersamaan (1 penonton ≈ 1× bitrate stream).
+* MJPEG adalah koneksi panjang dan bisa diputus oleh timeout proxy Cloudflare; HLS lebih aman lewat tunnel.
+* Cek kebijakan Cloudflare untuk traffic video di plan Anda sebelum dibuka ke publik luas.
+* `pm2 logs zknet-cctv` untuk log; `pm2 monit` untuk CPU/RAM.
+
 ## Menambah kamera
 
 | Tipe | URL contoh | Catatan |

@@ -3,13 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "description": "CCTV stream hub: landing page, admin, akses publik/berkode, cluster, dan embed mini-app",
-  "workspaces": ["server", "web"],
+  "workspaces": [
+    "server",
+    "web"
+  ],
   "scripts": {
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
     "build": "npm run build -w web && npm run build -w server",
     "start": "npm run start -w server",
-    "test": "npm run test -w server"
+    "test": "npm run test -w server",
+    "db:export": "node scripts/db-export.mjs",
+    "release": "bash deploy/release.sh"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  }
 }
