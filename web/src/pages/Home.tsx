@@ -77,6 +77,7 @@ export default function Home() {
 
         <div className="dashboard-content">
           <section className="dashboard-hero" aria-labelledby="hero-title">
+            <img className="dashboard-hero-image" src="/dashboard-banner.png" alt="Pantau lingkungan desa lebih aman dan nyaman dengan CCTV publik" />
             <div className="hero-copy">
               <span className="eyebrow">LAYANAN PEMANTAUAN LINGKUNGAN</span>
               <h1 id="hero-title">Pantau Lingkungan Desa<br />Lebih Aman dan Nyaman</h1>
@@ -87,7 +88,6 @@ export default function Home() {
                 <span>♧ <b>Desa Makin Tertata</b></span>
               </div>
             </div>
-            <div className="hero-illustration" aria-hidden><span className="hero-camera">◉</span><span className="hero-pole" /></div>
           </section>
 
           <section className="stats-grid" aria-label="Ringkasan kamera">
