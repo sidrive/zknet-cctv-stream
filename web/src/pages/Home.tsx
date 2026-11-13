@@ -65,7 +65,7 @@ export default function Home() {
           <div className="zk-avatar"><svg className="zk-icon"><use href="#i-user"/></svg></div>
         </header>
 
-        <section className="zk-hero">
+        <section className="zk-hero" style={{ '--zk-hero-img': 'url(/dashboard-banner.png)' } as any}>
           <h2 className="zk-hero__title">Pantau Lingkungan Desa Lebih Aman dan Nyaman</h2>
           <p className="zk-hero__sub">CCTV publik untuk keamanan, ketertiban, dan kenyamanan bersama.</p>
           <div className="zk-hero__chips">
