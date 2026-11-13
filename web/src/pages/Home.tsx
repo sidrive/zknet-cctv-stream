@@ -128,14 +128,22 @@ export default function Home() {
 function ClusterRow({ cluster, onOpen }: { cluster: Cluster; onOpen: () => void }) {
   const locked = cluster.locked && !cluster.unlocked
   return (
-    <button className="zk-cluster-item" onClick={onOpen}>
-      <div className="zk-cluster-item__icon"><svg className="zk-icon"><use href="#i-users"/></svg></div>
-      <div className="zk-cluster-item__info">
-        <div className="zk-cluster-item__name">{cluster.name}</div>
-        <div className="zk-cluster-item__meta">{cluster.description || 'Kamera CCTV publik'} · {cluster.cameraCount} kamera</div>
+    <div className="zk-list-item" onClick={onOpen} role="button" tabIndex={0} style={{cursor: 'pointer', width: '100%', textAlign: 'left', border: '1px solid var(--zk-border)', background: 'var(--zk-surface-2)'}}>
+      <div className="zk-list-item__thumb ph1" style={{ display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '1.25rem', color: '#fff' }}>
+        {cluster.name.slice(0, 2).toUpperCase()}
       </div>
-      <span className={`zk-badge ${locked ? 'zk-badge--warn' : 'zk-badge--success'}`}>{locked ? 'Berkode' : 'Online'}</span>
-    </button>
+      <div className="zk-list-item__body">
+        <h3 className="zk-list-item__title">{cluster.name}</h3>
+        <p className="zk-list-item__desc">{cluster.description || 'Kamera CCTV publik'}<br />{cluster.cameraCount} kamera</p>
+      </div>
+      <div className="zk-list-item__aside">
+        <span className={`zk-badge ${locked ? 'zk-badge--locked' : 'zk-badge--online'}`}>
+          {locked && <svg className="zk-icon" style={{width: 12, height: 12}}><use href="#i-lock"/></svg>}
+          {locked ? 'Berkode' : 'Online'}
+        </span>
+        <svg className="zk-icon zk-list-item__chev"><use href="#i-chev"/></svg>
+      </div>
+    </div>
   )
 }
 
