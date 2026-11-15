@@ -9,6 +9,8 @@ export default function Home() {
   const nav = useNavigate()
   const [q, setQ] = useState('')
   const [unlock, setUnlock] = useState<Cluster | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
   const term = q.trim().toLowerCase()
   const match = (s: string) => s.toLowerCase().includes(term)
@@ -31,21 +33,29 @@ export default function Home() {
   if (error) return <div className="page"><p className="error">{error}</p></div>
   if (!data) return <div className="page"><p className="muted">Memuat…</p></div>
 
+  const closeMenu = () => setMenuOpen(false)
+
   return (
     <div className="zk-app">
-      <aside className="zk-sidebar" aria-label="Navigasi utama">
-        <Link className="zk-brand" to="/" aria-label={`${data.site.site_title}, beranda`}>
-          <div className="zk-brand__name">zk<b>net</b></div>
-          <div className="zk-brand__tag">Internet untuk Desa</div>
-        </Link>
+      {menuOpen && <div className="zk-drawer-backdrop" onClick={closeMenu} aria-hidden="true" />}
+
+      <aside className={`zk-sidebar ${menuOpen ? 'is-open' : ''}`} aria-label="Navigasi utama">
+        <div className="zk-sidebar__header">
+          <Link className="zk-brand" to="/" onClick={closeMenu} aria-label={`${data.site.site_title}, beranda`}>
+            <img src="/zknet-logo.png" alt="ZKNet - Internet untuk Desa" className="zk-brand__logo" />
+          </Link>
+          <button className="zk-icon-btn zk-sidebar__close" onClick={closeMenu} aria-label="Tutup menu">
+            <svg className="zk-icon"><use href="#i-close"/></svg>
+          </button>
+        </div>
 
         <nav className="zk-nav">
-          <a className="zk-nav__item is-active" href="#dashboard"><svg className="zk-icon"><use href="#i-home"/></svg>Dashboard</a>
-          <a className="zk-nav__item" href="#cctv-publik"><svg className="zk-icon"><use href="#i-cam"/></svg>CCTV Publik</a>
-          <a className="zk-nav__item" href="#cluster"><svg className="zk-icon"><use href="#i-users"/></svg>Cluster</a>
-          <a className="zk-nav__item" href="#cctv-publik"><svg className="zk-icon"><use href="#i-map"/></svg>Peta Lokasi</a>
-          <a className="zk-nav__item" href="#status"><svg className="zk-icon"><use href="#i-signal"/></svg>Status Jaringan</a>
-          <Link className="zk-nav__item" to="/admin"><svg className="zk-icon"><use href="#i-gear"/></svg>Pengaturan</Link>
+          <a className="zk-nav__item is-active" href="#dashboard" onClick={closeMenu}><svg className="zk-icon"><use href="#i-home"/></svg>Dashboard</a>
+          <a className="zk-nav__item" href="#cctv-publik" onClick={closeMenu}><svg className="zk-icon"><use href="#i-cam"/></svg>CCTV Publik</a>
+          <a className="zk-nav__item" href="#cluster" onClick={closeMenu}><svg className="zk-icon"><use href="#i-users"/></svg>Cluster</a>
+          <a className="zk-nav__item" href="#cctv-publik" onClick={closeMenu}><svg className="zk-icon"><use href="#i-map"/></svg>Peta Lokasi</a>
+          <a className="zk-nav__item" href="#status" onClick={closeMenu}><svg className="zk-icon"><use href="#i-signal"/></svg>Status Jaringan</a>
+          <Link className="zk-nav__item" to="/admin" onClick={closeMenu}><svg className="zk-icon"><use href="#i-gear"/></svg>Pengaturan</Link>
         </nav>
         <div className="zk-sidebar__footer zk-promo-side">
           <h3 className="zk-promo-side__title">Pasang Internet ZKNet</h3>
@@ -56,13 +66,26 @@ export default function Home() {
 
       <main className="zk-main" id="dashboard">
         <header className="zk-topbar">
+          <button className="zk-icon-btn zk-menu-btn" onClick={() => setMenuOpen(true)} aria-label="Buka menu navigasi">
+            <svg className="zk-icon"><use href="#i-menu"/></svg>
+          </button>
+          <Link to="/" className="zk-topbar__brand" aria-label="ZKNet">
+            <img src="/zknet-logo.png" alt="ZKNet" className="zk-topbar__logo" />
+          </Link>
+
           <div className="zk-topbar__title">
             <h1>ZKNet CCTV</h1>
             <p>Pemantauan kamera CCTV publik di wilayah layanan ZKNet.</p>
           </div>
-          <label className="zk-search"><svg className="zk-icon"><use href="#i-search"/></svg><input type="search" placeholder="Cari kamera, lokasi, atau cluster…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari kamera, lokasi, atau cluster" /><span className="zk-kbd">⌘ K</span></label>
-          <button className="zk-icon-btn" aria-label="Notifikasi"><svg className="zk-icon"><use href="#i-bell"/></svg><span className="zk-dot"></span></button>
-          <div className="zk-avatar"><svg className="zk-icon"><use href="#i-user"/></svg></div>
+          <label className="zk-search">
+            <svg className="zk-icon"><use href="#i-search"/></svg>
+            <input type="search" placeholder="Cari kamera, lokasi, atau cluster…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari kamera, lokasi, atau cluster" />
+            <span className="zk-kbd">⌘ K</span>
+          </label>
+          <div className="zk-topbar__actions">
+            <button className="zk-icon-btn" aria-label="Notifikasi"><svg className="zk-icon"><use href="#i-bell"/></svg><span className="zk-dot"></span></button>
+            <div className="zk-avatar"><svg className="zk-icon"><use href="#i-user"/></svg></div>
+          </div>
         </header>
 
         <section className="zk-hero" style={{ '--zk-hero-img': 'url(/dashboard-banner.png)' } as any}>
@@ -75,7 +98,7 @@ export default function Home() {
           </div>
         </section>
 
-        <div className="zk-grid-stats">
+        <div className="zk-grid-stats" id="status">
           <div className="zk-stat zk-stat--primary"><div className="zk-stat__icon"><svg className="zk-icon"><use href="#i-cam"/></svg></div><div><div className="zk-stat__label">Total Kamera</div><div className="zk-stat__value">{data.cameras.length}</div></div></div>
           <div className="zk-stat zk-stat--success"><div className="zk-stat__icon"><svg className="zk-icon"><use href="#i-radio"/></svg></div><div><div className="zk-stat__label">Online</div><div className="zk-stat__value">{data.cameras.length - protectedCount}</div></div></div>
           <div className="zk-stat zk-stat--danger"><div className="zk-stat__icon"><svg className="zk-icon"><use href="#i-radio"/></svg></div><div><div className="zk-stat__label">Perlu Kode</div><div className="zk-stat__value">{protectedCount}</div></div></div>
@@ -85,39 +108,78 @@ export default function Home() {
 
         <div className="zk-grid-split">
           <div className="zk-stack">
-            <section className="zk-panel">
-              <div className="zk-panel__head"><h2 className="zk-h2"><svg className="zk-icon"><use href="#i-users"/></svg>Daftar Cluster</h2><a className="zk-link" href="#">Lihat Semua</a></div>
+            <section className="zk-panel" id="cluster">
+              <div className="zk-panel__head"><h2 className="zk-h2"><svg className="zk-icon"><use href="#i-users"/></svg>Daftar Cluster</h2><a className="zk-link" href="#">Lihat Semua &rarr;</a></div>
               <div className="zk-stack">
-                {clusters.map((cluster) => (
-                  <ClusterRow key={cluster.id} cluster={cluster} onOpen={() => (cluster.locked && !cluster.unlocked ? setUnlock(cluster) : nav(`/c/${cluster.slug}`))} />
+                {clusters.map((cluster, i) => (
+                  <ClusterRow key={cluster.id} cluster={cluster} index={i} onOpen={() => (cluster.locked && !cluster.unlocked ? setUnlock(cluster) : nav(`/c/${cluster.slug}`))} />
                 ))}
                 {clusters.length === 0 && <p className="muted">Tidak ada cluster yang cocok dengan pencarian.</p>}
               </div>
             </section>
-            <section className="zk-promo">
-              <div><h3 className="zk-promo__title">Internet Stabil di Rumah &amp; Usaha?</h3><p className="zk-promo__sub">Pasang internet ZKNet sekarang!</p></div>
-              <a className="zk-btn zk-btn--whatsapp" href="https://wa.me/6285640420791" target="_blank" rel="noreferrer">Hubungi Kami</a>
+
+            <section className="zk-promo" aria-label="Iklan Pasang Internet ZKNet">
+              <div className="zk-promo__mascot" aria-hidden="true" />
+              <div className="zk-promo__content">
+                <div className="zk-promo__main">
+                  <h3 className="zk-promo__heading">
+                    <span>Internet Stabil</span>
+                    <span>di Rumah &amp; Usaha?</span>
+                  </h3>
+                  <p className="zk-promo__sub">Pasang internet ZKNet sekarang!</p>
+                </div>
+                <a className="zk-promo__btn" href="https://wa.me/6285640420791" target="_blank" rel="noreferrer" aria-label="Hubungi kami via WhatsApp 085640420791">
+                  <div className="zk-promo__btn-icon">
+                    <svg className="zk-icon"><use href="#i-whatsapp"/></svg>
+                  </div>
+                  <div className="zk-promo__btn-text">
+                    <span className="zk-promo__btn-label">Hubungi Kami</span>
+                    <span className="zk-promo__btn-phone">085640420791</span>
+                  </div>
+                </a>
+              </div>
             </section>
           </div>
 
-          <section className="zk-panel">
+          <section className="zk-panel" id="cctv-publik">
             <div className="zk-panel__head">
               <h2 className="zk-h2"><svg className="zk-icon"><use href="#i-video"/></svg>{featuredCluster ? featuredCluster.name : 'CCTV Publik'}</h2>
               <div className="zk-panel__tools">
                 <div className="zk-segmented" role="group" aria-label="Tampilan">
-                  <button aria-pressed="true" aria-label="Grid"><svg className="zk-icon"><use href="#i-grid"/></svg></button>
-                  <button aria-pressed="false" aria-label="Daftar"><svg className="zk-icon"><use href="#i-list"/></svg></button>
+                  <button aria-pressed={viewMode === 'grid'} onClick={() => setViewMode('grid')} aria-label="Grid"><svg className="zk-icon"><use href="#i-grid"/></svg></button>
+                  <button aria-pressed={viewMode === 'list'} onClick={() => setViewMode('list')} aria-label="Daftar"><svg className="zk-icon"><use href="#i-list"/></svg></button>
                 </div>
               </div>
             </div>
-            <div className="zk-grid-cams" style={{'--zk-cols':3} as any}>
-              {featuredCameras.map((camera) => <DashboardCameraCard key={camera.id} camera={camera} onOpen={() => nav(`/v/${camera.id}`)} />)}
-              {featuredCameras.length === 0 && <p className="muted">Belum ada kamera untuk ditampilkan.</p>}
-            </div>
+
+            {viewMode === 'grid' ? (
+              <div className="zk-grid-cams" style={{'--zk-cols':3} as any}>
+                {featuredCameras.map((camera, i) => (
+                  <DashboardCameraCard key={camera.id} camera={camera} index={i} onOpen={() => nav(`/v/${camera.id}`)} />
+                ))}
+                {featuredCameras.length === 0 && <p className="muted">Belum ada kamera untuk ditampilkan.</p>}
+              </div>
+            ) : (
+              <div className="zk-cams-list">
+                {featuredCameras.map((camera) => (
+                  <DashboardCameraRow key={camera.id} camera={camera} onOpen={() => nav(`/v/${camera.id}`)} />
+                ))}
+                {featuredCameras.length === 0 && <p className="muted">Belum ada kamera untuk ditampilkan.</p>}
+              </div>
+            )}
           </section>
         </div>
 
-        {loose.length > 0 && !featuredCluster && <section className="zk-panel"><h2>Kamera umum</h2><div className="zk-grid-cams" style={{'--zk-cols':4} as any}>{loose.map((camera) => <DashboardCameraCard key={camera.id} camera={camera} onOpen={() => nav(`/v/${camera.id}`)} />)}</div></section>}
+        {loose.length > 0 && !featuredCluster && (
+          <section className="zk-panel">
+            <h2>Kamera umum</h2>
+            <div className="zk-grid-cams" style={{'--zk-cols':4} as any}>
+              {loose.map((camera, i) => (
+                <DashboardCameraCard key={camera.id} camera={camera} index={i} onOpen={() => nav(`/v/${camera.id}`)} />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       {unlock && <UnlockDialog kind="cluster" id={unlock.id} title={unlock.name} onClose={() => setUnlock(null)} onUnlocked={() => { const slug = unlock.slug; setUnlock(null); reload(); nav(`/c/${slug}`) }} />}
@@ -125,11 +187,12 @@ export default function Home() {
   )
 }
 
-function ClusterRow({ cluster, onOpen }: { cluster: Cluster; onOpen: () => void }) {
+function ClusterRow({ cluster, onOpen, index = 0 }: { cluster: Cluster; onOpen: () => void; index?: number }) {
   const locked = cluster.locked && !cluster.unlocked
+  const phClass = `ph${(index % 4) + 1}`
   return (
     <div className="zk-list-item" onClick={onOpen} role="button" tabIndex={0} style={{cursor: 'pointer', width: '100%', textAlign: 'left', border: '1px solid var(--zk-border)', background: 'var(--zk-surface-2)'}}>
-      <div className="zk-list-item__thumb ph1" style={{ display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '1.25rem', color: '#fff' }}>
+      <div className={`zk-list-item__thumb ${phClass}`} style={{ display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '1.25rem', color: '#fff' }}>
         {cluster.name.slice(0, 2).toUpperCase()}
       </div>
       <div className="zk-list-item__body">
@@ -147,18 +210,39 @@ function ClusterRow({ cluster, onOpen }: { cluster: Cluster; onOpen: () => void 
   )
 }
 
-function DashboardCameraCard({ camera, onOpen }: { camera: Camera; onOpen: () => void }) {
+function DashboardCameraCard({ camera, onOpen, index = 0 }: { camera: Camera; onOpen: () => void; index?: number }) {
+  const locked = camera.locked && !camera.unlocked
+  const phClass = `ph${(index % 4) + 1}`
+  return (
+    <div className={`zk-cam ${phClass}`} onClick={onOpen} role="button" tabIndex={0} style={{cursor: 'pointer'}}>
+      <span className="zk-badge zk-badge--live">LIVE</span>
+      {locked && (
+        <span className="zk-badge zk-badge--locked" style={{position: 'absolute', top: 8, right: 8, zIndex: 1}}>
+          <svg className="zk-icon" style={{width: 12, height: 12}}><use href="#i-lock"/></svg> Berkode
+        </span>
+      )}
+      <div className="zk-cam__caption">
+        <svg className="zk-icon" style={{width: 16, height: 16, flexShrink: 0}}><use href="#i-video"/></svg>
+        <span>{camera.name}</span>
+      </div>
+    </div>
+  )
+}
+
+function DashboardCameraRow({ camera, onOpen }: { camera: Camera; onOpen: () => void }) {
   const locked = camera.locked && !camera.unlocked
   return (
-    <div className="zk-card zk-cam-card" onClick={onOpen} style={{cursor: 'pointer'}}>
-      <div className="zk-cam-card__thumb">
-        <div className="zk-badge zk-badge--live">LIVE</div>
-        {locked && <div className="zk-cam-card__lock"><svg className="zk-icon"><use href="#i-lock"/></svg></div>}
+    <div className="zk-cam-row" onClick={onOpen} role="button" tabIndex={0}>
+      <div className="zk-cam-row__info">
+        <svg className="zk-icon" style={{width: 20, height: 20, color: 'var(--zk-primary-hi)', flexShrink: 0}}><use href="#i-video"/></svg>
+        <div style={{minWidth: 0}}>
+          <div className="zk-cam-row__name">{camera.name}</div>
+          {camera.location && <div className="zk-cam-row__loc">{camera.location}</div>}
+        </div>
       </div>
-      <div className="zk-cam-card__body">
-        <div className="zk-cam-card__title">{camera.name}</div>
-        <div className="zk-cam-card__loc">{camera.location}</div>
-      </div>
+      <span className={`zk-badge ${locked ? 'zk-badge--locked' : 'zk-badge--live'}`}>
+        {locked ? 'Berkode' : 'LIVE'}
+      </span>
     </div>
   )
 }

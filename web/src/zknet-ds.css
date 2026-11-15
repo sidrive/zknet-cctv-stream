@@ -124,20 +124,11 @@ body.zk { margin: 0; background: var(--zk-grad-page); color: var(--zk-text);
 .zk-grid-cams  { display: grid; grid-template-columns: repeat(var(--zk-cols, 3), minmax(0, 1fr)); gap: var(--zk-s-3); }
 .zk-stack { display: grid; gap: var(--zk-s-3); }
 
-@media (max-width: 1100px) {
-  .zk-grid-stats { grid-template-columns: repeat(3, 1fr); }
-  .zk-grid-split { grid-template-columns: 1fr; }
-}
-@media (max-width: 820px) {
-  .zk-app { grid-template-columns: 1fr; }
-  .zk-sidebar { display: none; }           /* ganti dengan drawer di app Anda */
-  .zk-grid-stats { grid-template-columns: repeat(2, 1fr); }
-  .zk-grid-cams { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 520px) {
-  .zk-grid-cams { grid-template-columns: 1fr; }
-  .zk-hero { min-height: 220px; }
-}
+/* Placeholder gradasi thumbnail */
+.ph1 { background: linear-gradient(135deg, #1d3b73 0%, #2a5a40 100%); }
+.ph2 { background: linear-gradient(135deg, #1b3a5c 0%, #524731 100%); }
+.ph3 { background: linear-gradient(135deg, #27486b 0%, #244b3c 100%); }
+.ph4 { background: linear-gradient(135deg, #2c3852 0%, #4a4433 100%); }
 
 /* ---------- 4. SIDEBAR --------------------------------------------------- */
 .zk-sidebar {
@@ -146,11 +137,25 @@ body.zk { margin: 0; background: var(--zk-grad-page); color: var(--zk-text);
   padding: var(--zk-s-5) var(--zk-s-3);
   display: flex; flex-direction: column; gap: var(--zk-s-6);
   position: sticky; top: 0; height: 100vh;
+  z-index: 40;
+  overflow-y: auto;
 }
-.zk-brand { padding: 0 var(--zk-s-3); }
+.zk-sidebar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--zk-s-2);
+}
+.zk-brand { display: flex; align-items: center; padding: 0 var(--zk-s-1); text-decoration: none; }
+.zk-brand__logo { width: 170px; max-width: 100%; height: auto; display: block; object-fit: contain; }
 .zk-brand__name { font-size: 2rem; font-weight: 800; font-style: italic; letter-spacing: -0.03em; line-height: 1; }
 .zk-brand__name b { color: var(--zk-primary-hi); font-weight: 800; }
 .zk-brand__tag { font-size: var(--zk-fs-xs); font-style: italic; color: var(--zk-text-muted); margin-top: 2px; }
+.zk-sidebar__close { display: none; }
+.zk-drawer-backdrop { display: none; }
+.zk-menu-btn { display: none; }
+.zk-topbar__brand { display: none; }
+.zk-topbar__actions { display: flex; align-items: center; gap: var(--zk-s-3); }
 
 .zk-nav { display: grid; gap: var(--zk-s-1); }
 .zk-nav__item {
@@ -191,6 +196,9 @@ body.zk { margin: 0; background: var(--zk-grad-page); color: var(--zk-text);
 .zk-icon-btn:hover { background: var(--zk-surface-2); }
 .zk-icon-btn .zk-dot { position: absolute; top: 9px; right: 11px; width: 9px; height: 9px; background: var(--zk-live); border-radius: 50%; border: 2px solid var(--zk-bg); }
 .zk-avatar { width: 46px; height: 46px; border-radius: 50%; background: #c9d6f2; color: #4c628f; display: grid; place-items: center; }
+
+.zk-sidebar__close, .zk-icon-btn.zk-sidebar__close { display: none; }
+.zk-menu-btn, .zk-icon-btn.zk-menu-btn { display: none; }
 
 /* ---------- 6. HERO ------------------------------------------------------ */
 .zk-hero {
@@ -321,15 +329,131 @@ body.zk { margin: 0; background: var(--zk-grad-page); color: var(--zk-text);
   color: var(--zk-text); font: inherit; font-size: var(--zk-fs-sm); cursor: pointer;
 }
 
-/* ---------- 11. PROMO / CTA --------------------------------------------- */
+/* ---------- 11. PROMO / BANNER IKLAN ------------------------------------- */
 .zk-promo {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--zk-s-4);
-  padding: var(--zk-s-5) var(--zk-s-6); border-radius: var(--zk-r-xl);
-  background: var(--zk-grad-promo); border: 1px solid rgba(255,255,255,0.18);
-  box-shadow: 0 12px 32px rgba(31, 107, 255, 0.35);
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--zk-r-lg);
+  background-color: #08255e;
+  background-image: url('/promo-banner.png');
+  background-position: left center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  box-shadow: 0 8px 24px rgba(4, 18, 51, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  min-height: 104px;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
 }
-.zk-promo__title { font-size: var(--zk-fs-xl); font-weight: 800; line-height: 1.15; margin: 0; }
-.zk-promo__sub { margin: var(--zk-s-1) 0 0; font-size: var(--zk-fs-sm); }
+
+.zk-promo__mascot {
+  width: 125px;
+  height: 100%;
+  min-height: 104px;
+  flex-shrink: 0;
+}
+
+.zk-promo__content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zk-s-3);
+  padding: var(--zk-s-3) var(--zk-s-4) var(--zk-s-3) 0;
+  z-index: 1;
+  min-width: 0;
+}
+
+.zk-promo__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.zk-promo__heading {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.18;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.zk-promo__sub {
+  margin: 3px 0 0 0;
+  font-size: 0.8rem;
+  color: #93c5fd;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+/* WhatsApp CTA Button */
+.zk-promo__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--zk-r-pill);
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4);
+  text-decoration: none;
+  color: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform var(--zk-dur) var(--zk-ease), box-shadow var(--zk-dur) var(--zk-ease);
+}
+
+.zk-promo__btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(22, 163, 74, 0.6);
+}
+
+.zk-promo__btn:active {
+  transform: translateY(0);
+}
+
+.zk-promo__btn-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.zk-promo__btn-icon .zk-icon {
+  width: 18px;
+  height: 18px;
+  color: #ffffff;
+}
+
+.zk-promo__btn-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.zk-promo__btn-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: #ffffff;
+}
+
+.zk-promo__btn-phone {
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  color: #ffffff;
+}
 
 .zk-promo-side {
   border-radius: var(--zk-r-xl); border: 1px solid var(--zk-border-strong);
@@ -338,7 +462,236 @@ body.zk { margin: 0; background: var(--zk-grad-page); color: var(--zk-text);
 }
 .zk-promo-side__title { font-size: var(--zk-fs-xl); font-weight: 800; line-height: 1.1; margin: 0; }
 
+/* Mode daftar untuk kamera */
+.zk-cams-list { display: flex; flex-direction: column; gap: var(--zk-s-2); }
+.zk-cam-row {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--zk-s-3);
+  padding: var(--zk-s-3) var(--zk-s-4); background: var(--zk-surface-2); border: 1px solid var(--zk-border);
+  border-radius: var(--zk-r-md); cursor: pointer;
+  transition: background var(--zk-dur) var(--zk-ease), border-color var(--zk-dur) var(--zk-ease);
+}
+.zk-cam-row:hover { background: var(--zk-surface-3); border-color: var(--zk-border-strong); }
+.zk-cam-row__info { display: flex; align-items: center; gap: var(--zk-s-3); min-width: 0; flex: 1; }
+.zk-cam-row__name { font-weight: var(--zk-fw-semibold); font-size: var(--zk-fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zk-cam-row__loc { font-size: var(--zk-fs-xs); color: var(--zk-text-muted); }
+
 /* ---------- 12. PREFERENSI GERAK ---------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
+}
+
+/* ---------- 13. RESPONSIVE / MEDIA QUERIES ------------------------------ */
+@media (max-width: 1100px) {
+  .zk-grid-stats { grid-template-columns: repeat(3, 1fr); }
+  .zk-grid-split { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 900px) {
+  .zk-app {
+    grid-template-columns: 1fr;
+  }
+
+  /* Hamburger & Mobile Brand in Topbar */
+  .zk-menu-btn, .zk-icon-btn.zk-menu-btn {
+    display: grid;
+    place-items: center;
+  }
+  .zk-topbar__brand {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+  }
+  .zk-topbar__logo {
+    height: 32px;
+    width: auto;
+    max-width: 140px;
+    object-fit: contain;
+    display: block;
+  }
+  .zk-topbar {
+    flex-wrap: wrap;
+    gap: var(--zk-s-3);
+    min-height: auto;
+    padding: var(--zk-s-2) 0;
+  }
+  .zk-topbar__title {
+    display: none;
+  }
+  .zk-search {
+    width: 100%;
+    order: 3;
+    height: 44px;
+  }
+  .zk-kbd {
+    display: none;
+  }
+  .zk-topbar__actions {
+    margin-left: auto;
+  }
+
+  /* Off-canvas Drawer Sidebar */
+  .zk-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 285px;
+    max-width: 85vw;
+    height: 100dvh;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform var(--zk-dur) var(--zk-ease);
+    box-shadow: none;
+  }
+  .zk-sidebar.is-open {
+    transform: translateX(0);
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.75);
+  }
+  .zk-sidebar__close, .zk-icon-btn.zk-sidebar__close {
+    display: grid;
+    place-items: center;
+  }
+  .zk-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(3, 10, 26, 0.75);
+    backdrop-filter: blur(4px);
+    z-index: 999;
+  }
+
+  /* Main Container Padding */
+  .zk-main {
+    padding: var(--zk-s-3) var(--zk-s-4) var(--zk-s-6);
+    gap: var(--zk-s-3);
+  }
+
+  /* Hero Banner */
+  .zk-hero {
+    min-height: 160px;
+    padding: var(--zk-s-4);
+    gap: var(--zk-s-2);
+  }
+  .zk-hero__title {
+    font-size: 1.35rem;
+    max-width: 100%;
+  }
+  .zk-hero__sub {
+    font-size: var(--zk-fs-sm);
+    max-width: 100%;
+  }
+  .zk-hero__chips {
+    gap: var(--zk-s-2);
+    margin-top: var(--zk-s-1);
+  }
+  .zk-chip {
+    height: 34px;
+    padding: 0 var(--zk-s-3);
+    font-size: var(--zk-fs-xs);
+  }
+
+  /* Stats Grid */
+  .zk-grid-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--zk-s-2);
+  }
+  .zk-stat {
+    padding: var(--zk-s-3);
+    gap: var(--zk-s-3);
+  }
+  .zk-stat__icon {
+    width: 44px;
+    height: 44px;
+  }
+  .zk-stat__icon .zk-icon {
+    width: 22px;
+    height: 22px;
+  }
+  .zk-stat__value {
+    font-size: 1.35rem;
+  }
+  .zk-stat--status {
+    grid-column: 1 / -1;
+  }
+
+  /* Split Grid: Prioritize CCTV first on mobile! */
+  .zk-grid-split {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--zk-s-4);
+  }
+  .zk-grid-split > * {
+    width: 100%;
+  }
+  .zk-grid-split > .zk-panel:last-child {
+    order: 1;
+  }
+  .zk-grid-split > .zk-stack {
+    order: 2;
+  }
+
+  /* CCTV Grid on Mobile/Tablet */
+  .zk-grid-cams {
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--zk-s-3);
+  }
+}
+
+/* Promo Banner Responsive */
+@media (max-width: 600px) {
+  .zk-promo {
+    min-height: 90px;
+  }
+  .zk-promo__mascot {
+    width: 95px;
+    min-height: 90px;
+  }
+  .zk-promo__content {
+    padding: var(--zk-s-2) var(--zk-s-3) var(--zk-s-2) 0;
+    gap: var(--zk-s-2);
+  }
+  .zk-promo__heading {
+    font-size: 0.95rem;
+  }
+  .zk-promo__sub {
+    font-size: 0.72rem;
+  }
+  .zk-promo__btn {
+    padding: 6px 10px;
+  }
+  .zk-promo__btn-phone {
+    font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 440px) {
+  .zk-promo__mascot {
+    display: none;
+  }
+  .zk-promo__content {
+    padding: var(--zk-s-3);
+  }
+}
+
+@media (max-width: 600px) {
+  .zk-grid-cams {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--zk-s-2);
+  }
+}
+
+@media (max-width: 360px) {
+  .zk-grid-cams {
+    grid-template-columns: 1fr;
+  }
+  .zk-list-item {
+    padding: var(--zk-s-2);
+    gap: var(--zk-s-2);
+  }
+  .zk-list-item__thumb {
+    width: 64px;
+    height: 52px;
+    font-size: 1rem;
+  }
 }

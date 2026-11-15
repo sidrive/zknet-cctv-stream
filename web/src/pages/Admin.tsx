@@ -36,6 +36,9 @@ function AuthForm({ mode, tokenRequired, onDone }: { mode: 'setup' | 'login'; to
   return (
     <div className="auth">
       <form className="card auth-card" onSubmit={submit}>
+        <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+          <img src="/zknet-logo.png" alt="ZKNet" style={{ height: 44, width: 'auto', objectFit: 'contain' }} />
+        </div>
         <h1>{mode === 'setup' ? 'Setup admin pertama' : 'Login admin'}</h1>
         {mode === 'setup' && <p className="muted">Buat akun administrator untuk mengelola kamera dan cluster.</p>}
         <label className="field"><span>Username</span><input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required minLength={3} /></label>
@@ -66,8 +69,11 @@ function Dashboard({ username, onLogout }: { username: string; onLogout: () => v
 
   return (
     <div className="container page">
-      <div className="row between wrap">
-        <h1>Panel admin</h1>
+      <div className="row between wrap" style={{ alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <img src="/zknet-logo.png" alt="ZKNet" style={{ height: 32, width: 'auto', objectFit: 'contain' }} />
+          <h1 style={{ margin: 0 }}>Panel admin</h1>
+        </div>
         <div className="row gap-s">
           <Link className="btn btn-ghost" to="/">Lihat situs</Link>
           <span className="muted small">{username}</span>
