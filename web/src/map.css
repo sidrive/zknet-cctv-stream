@@ -1,0 +1,224 @@
+/* ================= Peta Lokasi — gaya OSIRIS =================
+   Kanvas gelap penuh, aksen emas #D4AF37, marker bulat bercahaya,
+   rail layer di kiri dan pemilih tampilan 3D/2D/MAP/SAT di kiri-bawah. */
+
+.os-page {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 0;
+  padding: 0;
+  height: 100vh;
+  max-width: none;
+  background: #05080f;
+}
+
+/* ---------- Bar atas ---------- */
+.os-topbar {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #0a1020, #070c17);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.28);
+}
+.os-back {
+  display: grid; place-items: center;
+  width: 30px; height: 30px;
+  border-radius: 6px; border: 1px solid rgba(212, 175, 55, 0.45);
+  color: #d4af37; text-decoration: none; font-size: 15px;
+}
+.os-back:hover { background: rgba(212, 175, 55, 0.12); }
+.os-title { display: grid; line-height: 1.25; margin-right: auto; }
+.os-title strong { font-size: 12px; letter-spacing: 0.16em; color: #f3e2a8; }
+.os-title span { font-size: 11px; color: #7d8ea8; }
+
+.os-search {
+  display: flex; align-items: center; gap: 8px;
+  height: 32px; padding: 0 10px; min-width: 240px;
+  border-radius: 6px;
+  border: 1px solid rgba(120, 140, 170, 0.35);
+  background: rgba(8, 14, 26, 0.9);
+  color: #9fb0c8;
+}
+.os-search:focus-within { border-color: rgba(212, 175, 55, 0.6); }
+.os-search svg { width: 15px; height: 15px; flex: none; }
+.os-search input {
+  flex: 1; min-width: 0; border: 0; outline: 0; background: transparent;
+  color: #e8eef8; font-size: 12.5px;
+}
+.os-search input::placeholder { color: #6c7d95; }
+
+.os-results {
+  position: absolute; top: calc(100% - 2px); right: 14px;
+  width: 300px; max-height: 320px; overflow: auto;
+  margin: 0; padding: 4px; list-style: none;
+  background: #0b1220; border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 8px; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
+}
+.os-results button {
+  display: grid; gap: 1px; width: 100%; padding: 7px 9px;
+  text-align: left; background: transparent; border: 0; border-radius: 5px;
+  color: #e8eef8; cursor: pointer; font-size: 12.5px;
+}
+.os-results button:hover { background: rgba(212, 175, 55, 0.14); }
+.os-results em { font-style: normal; font-size: 11px; color: #7d8ea8; }
+
+/* ---------- Panggung peta ---------- */
+.os-stage { position: relative; min-height: 0; overflow: hidden; }
+.os-map { position: absolute; inset: 0; }
+.os-map__canvas { position: absolute; inset: 0; }
+.maplibregl-map { width: 100%; height: 100%; background: #05080f; }
+
+/* Marker kamera: titik kecil dengan cincin bercahaya */
+.os-mk {
+  position: relative;
+  width: 14px; height: 14px; padding: 0;
+  border: 0; background: transparent; cursor: pointer;
+}
+.os-mk__dot {
+  position: absolute; inset: 3px;
+  border-radius: 50%;
+  background: #38e1ff;
+  box-shadow: 0 0 8px 2px rgba(56, 225, 255, 0.85);
+}
+.os-mk__ring {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(56, 225, 255, 0.5);
+}
+.os-mk.is-offline .os-mk__dot { background: #e8454f; box-shadow: 0 0 8px 2px rgba(232, 69, 79, 0.8); }
+.os-mk.is-offline .os-mk__ring { border-color: rgba(232, 69, 79, 0.5); }
+.os-mk.is-active { transform: scale(1.5); }
+.os-mk.is-active .os-mk__dot { background: #d4af37; box-shadow: 0 0 12px 3px rgba(212, 175, 55, 0.9); }
+.os-mk.is-active .os-mk__ring { border-color: #d4af37; }
+.os-mk:hover { transform: scale(1.35); }
+
+/* Rail layer */
+.os-rail {
+  position: absolute; top: 12px; left: 12px;
+  display: grid; gap: 6px; justify-items: center;
+  padding: 8px 6px;
+  background: rgba(8, 13, 24, 0.88);
+  border: 1px solid rgba(120, 140, 170, 0.28);
+  border-radius: 8px;
+  backdrop-filter: blur(6px);
+}
+.os-rail__title { font-size: 8.5px; letter-spacing: 0.14em; color: #6c7d95; }
+.os-rail__btn {
+  position: relative;
+  display: grid; place-items: center;
+  width: 34px; height: 34px;
+  color: #8fa1ba; background: transparent;
+  border: 1px solid transparent; border-radius: 6px; cursor: pointer;
+}
+.os-rail__btn svg { width: 19px; height: 19px; }
+.os-rail__btn.is-on { color: #38e1ff; border-color: rgba(56, 225, 255, 0.45); background: rgba(56, 225, 255, 0.1); }
+.os-rail__btn em {
+  position: absolute; top: -5px; right: -6px;
+  padding: 0 4px; border-radius: 6px;
+  background: #d4af37; color: #1a1405;
+  font-size: 9px; font-style: normal; font-weight: 700;
+}
+
+/* Pemilih mode tampilan */
+.os-modes {
+  position: absolute; bottom: 16px; left: 12px;
+  display: flex; gap: 2px; padding: 3px;
+  background: rgba(8, 13, 24, 0.9);
+  border: 1px solid rgba(120, 140, 170, 0.3);
+  border-radius: 6px;
+  backdrop-filter: blur(6px);
+}
+.os-modes button {
+  min-width: 42px; height: 26px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+  color: #8fa1ba; background: transparent;
+  border: 0; border-radius: 4px; cursor: pointer;
+}
+.os-modes button:hover { color: #e8eef8; }
+.os-modes button.is-on { background: rgba(212, 175, 55, 0.18); color: #d4af37; }
+
+.os-map__warn {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  padding: 5px 10px; border-radius: 5px;
+  background: rgba(232, 69, 79, 0.14);
+  border: 1px solid rgba(232, 69, 79, 0.45);
+  color: #ffb3b8; font-size: 11px; max-width: 520px;
+}
+
+/* Atribusi wajib tetap terlihat (CARTO / OpenStreetMap / Esri) */
+.maplibregl-ctrl-attrib, .maplibregl-ctrl-attrib a {
+  background: rgba(5, 8, 15, 0.8) !important;
+  color: #93a4bd !important;
+  font-size: 10px !important;
+}
+.maplibregl-ctrl-group { background: rgba(8, 13, 24, 0.9) !important; border: 1px solid rgba(120,140,170,0.3) !important; }
+.maplibregl-ctrl-group button span { filter: invert(0.8); }
+.maplibregl-ctrl-scale {
+  background: rgba(5, 8, 15, 0.75) !important;
+  border-color: rgba(212, 175, 55, 0.5) !important;
+  color: #d4af37 !important;
+}
+
+/* ---------- Panel detail kamera ---------- */
+.os-detail {
+  position: absolute; right: 12px; bottom: 12px; z-index: 4;
+  width: 400px; max-width: calc(100% - 24px);
+  background: rgba(8, 13, 24, 0.97);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: 8px;
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+}
+.os-detail header {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.22);
+}
+.os-detail header div { display: grid; gap: 1px; min-width: 0; }
+.os-detail header strong { font-size: 12.5px; color: #f3e2a8; letter-spacing: 0.04em; }
+.os-detail header span { font-size: 11px; color: #7d8ea8; }
+.os-x {
+  margin-left: auto; width: 24px; height: 24px;
+  border: 1px solid rgba(120, 140, 170, 0.35); border-radius: 4px;
+  background: transparent; color: #9fb0c8; cursor: pointer; font-size: 11px;
+}
+.os-x:hover { color: #ffb3b8; border-color: rgba(232, 69, 79, 0.6); }
+.os-detail .player { border-radius: 0; border: 0; }
+.os-detail footer { display: grid; gap: 8px; padding: 9px 10px; }
+.os-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.os-fields > span {
+  display: grid; gap: 1px;
+  font-size: 8.5px; letter-spacing: 0.1em; color: #6c7d95;
+}
+.os-fields em { font-style: normal; font-size: 11.5px; color: #dfe7f3; letter-spacing: 0; }
+.os-fields em.is-ok { color: #41d98d; }
+.os-fields em.is-bad { color: #ff6b74; }
+.os-alink {
+  justify-self: start;
+  padding: 0; border: 0; background: transparent;
+  color: #d4af37; font-size: 11.5px; font-weight: 600; cursor: pointer;
+}
+.os-alink:hover { text-decoration: underline; }
+
+@media (max-width: 720px) {
+  .os-title span { display: none; }
+  .os-search { min-width: 0; flex: 1; }
+  .os-results { left: 14px; right: 14px; width: auto; }
+  .os-detail { right: 8px; left: 8px; bottom: 8px; width: auto; }
+  .os-modes { bottom: auto; top: 12px; left: 50%; transform: translateX(-50%); }
+  .os-rail { top: auto; bottom: 60px; }
+  .os-fields { grid-template-columns: 1fr 1fr; }
+}
+
+/* Kontrol MapLibre: tumpuk rapi di kanan-bawah, tidak tertimpa panel detail. */
+.os-map .maplibregl-ctrl-bottom-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.os-map .maplibregl-ctrl-bottom-right .maplibregl-ctrl { margin: 0; }
+.os-map.has-detail .maplibregl-ctrl-bottom-right { margin-bottom: 300px; }
+.os-map.has-detail .maplibregl-ctrl-attrib { margin-bottom: 300px; }
+
+/* Pemilih koordinat di Admin: peta kecil di dalam modal. */
+.coord-picker-map { height: 380px; border-radius: 10px; overflow: hidden; border: 1px solid var(--zk-border, #26303d); margin: 8px 0 12px; }
+@media (max-width: 640px) { .coord-picker-map { height: 260px; } }

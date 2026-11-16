@@ -173,6 +173,9 @@ const cameraBody = z
     listed: z.boolean().default(true),
     enabled: z.boolean().default(true),
     sort: z.number().int().default(0),
+    // Koordinat opsional untuk peta. null = belum ditentukan (jangan digambar di 0,0).
+    lat: z.number().min(-90).max(90).nullable().default(null),
+    lng: z.number().min(-180).max(180).nullable().default(null),
     ...accessFields,
 })
     .refine((v) => SCHEMES[v.sourceType].test(v.sourceUrl), {
@@ -184,6 +187,7 @@ const cameraOut = (c) => ({
     clusterId: c.cluster_id, sourceType: c.source_type, sourceUrl: c.source_url,
     proxy: !!c.proxy, transcode: !!c.transcode, listed: !!c.listed, enabled: !!c.enabled, sort: c.sort,
     accessMode: c.access_mode, hasCode: !!c.access_hash,
+    lat: c.lat ?? null, lng: c.lng ?? null,
 });
 adminRouter.get('/cameras', (_req, res) => {
     const rows = db.prepare('SELECT * FROM cameras ORDER BY sort, name').all();
@@ -203,8 +207,8 @@ adminRouter.post('/cameras', (req, res) => {
     if ('error' in h)
         return res.status(400).json({ error: h.error });
     const id = newId();
-    db.prepare(`INSERT INTO cameras(id,name,description,location,cluster_id,source_type,source_url,proxy,transcode,access_mode,access_hash,listed,enabled,sort)
-     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, d.name, d.description, d.location, d.clusterId, d.sourceType, d.sourceUrl, +d.proxy, +d.transcode, d.accessMode, h.hash, +d.listed, +d.enabled, d.sort);
+    db.prepare(`INSERT INTO cameras(id,name,description,location,cluster_id,source_type,source_url,proxy,transcode,access_mode,access_hash,listed,enabled,sort,lat,lng)
+     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, d.name, d.description, d.location, d.clusterId, d.sourceType, d.sourceUrl, +d.proxy, +d.transcode, d.accessMode, h.hash, +d.listed, +d.enabled, d.sort, d.lat, d.lng);
     res.status(201).json(cameraOut(db.prepare('SELECT * FROM cameras WHERE id = ?').get(id)));
 });
 adminRouter.put('/cameras/:id', (req, res) => {
@@ -221,7 +225,7 @@ adminRouter.put('/cameras/:id', (req, res) => {
     if ('error' in h)
         return res.status(400).json({ error: h.error });
     db.prepare(`UPDATE cameras SET name=?,description=?,location=?,cluster_id=?,source_type=?,source_url=?,proxy=?,transcode=?,
-       access_mode=?,access_hash=?,listed=?,enabled=?,sort=? WHERE id=?`).run(d.name, d.description, d.location, d.clusterId, d.sourceType, d.sourceUrl, +d.proxy, +d.transcode, d.accessMode, h.hash, +d.listed, +d.enabled, d.sort, old.id);
+       access_mode=?,access_hash=?,listed=?,enabled=?,sort=?,lat=?,lng=? WHERE id=?`).run(d.name, d.description, d.location, d.clusterId, d.sourceType, d.sourceUrl, +d.proxy, +d.transcode, d.accessMode, h.hash, +d.listed, +d.enabled, d.sort, d.lat, d.lng, old.id);
     ffmpeg.stop(old.id); // sumber mungkin berubah -> restart saat ditonton lagi
     res.json(cameraOut(db.prepare('SELECT * FROM cameras WHERE id = ?').get(old.id)));
 });

@@ -54,6 +54,16 @@ CREATE INDEX IF NOT EXISTS idx_cameras_cluster ON cameras(cluster_id);
 
 export const newId = () => crypto.randomBytes(8).toString('base64url')
 
+// Migrasi ringan: kolom baru ditambahkan hanya jika belum ada, jadi aman dijalankan
+// berulang pada database yang sudah berisi kamera.
+function ensureColumn(table: string, column: string, type: string) {
+  const cols = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name)
+  if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)
+}
+// Koordinat peta. NULL = belum ditentukan; jangan digambar di (0,0).
+ensureColumn('cameras', 'lat', 'REAL')
+ensureColumn('cameras', 'lng', 'REAL')
+
 const DEFAULTS: Record<string, string> = {
   site_title: 'ZKNet CCTV',
   site_description: 'Pantau kamera CCTV secara langsung.',

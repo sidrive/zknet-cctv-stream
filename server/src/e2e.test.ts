@@ -203,3 +203,81 @@ test('RTSP -> HLS via ffmpeg on-demand', { skip: !hasFfmpeg || !MTX }, async () 
     mtx.kill('SIGKILL')
   }
 })
+
+test('health/detail: menghitung online/offline dari probe sumber kamera', async () => {
+  // Kamera yang mati: port tidak ada yang mendengarkan.
+  const dead = await api('/api/admin/cameras', {
+    method: 'POST', admin: true,
+    json: { name: 'Mati', sourceType: 'hls', sourceUrl: 'http://127.0.0.1:18091/mati.m3u8', clusterId: ids.open },
+  })
+  assert.equal(dead.status, 201)
+  ids.dead = dead.body.id
+
+  const before = await api('/api/health/detail')
+  assert.equal(before.status, 200)
+  assert.equal(before.body.cameras.total, before.body.cameras.enabled)
+
+  const r = await api('/api/health/refresh', { method: 'POST', json: {} })
+  assert.equal(r.status, 200)
+
+  const after = await api('/api/health/detail')
+  const cam = (await api('/api/catalog')).body.cameras.find((c: any) => c.name === 'Mati')
+  assert.equal(cam.status, 'offline', 'kamera mati harus terdeteksi offline')
+  assert.ok(after.body.problems.some((p: any) => p.id === ids.dead))
+  assert.ok(after.body.cameras.offline >= 1)
+  assert.ok(after.body.lastCheckAt, 'waktu cek terakhir harus terisi')
+
+  // katalog tetap cepat & tidak membocorkan URL sumber walau probe jalan
+  assert.ok(!JSON.stringify((await api('/api/catalog')).body).includes('18091'))
+})
+
+test('katalog: status kamera ada dan kamera tanpa probe berstatus unknown', async () => {
+  const cat = (await api('/api/catalog')).body
+  assert.ok(typeof cat.lastCheckAt === 'number' || cat.lastCheckAt === null)
+  const free = cat.cameras.find((c: any) => c.name === 'Gerbang')
+  assert.ok(['online', 'offline', 'unknown'].includes(free.status))
+  // tidak ada kamera yang mengaku "online" padahal belum pernah diprobe
+  for (const c of cat.cameras) assert.ok(c.status, `${c.name} tidak punya status`)
+})
+
+test('koordinat: hanya dikirim untuk kamera yang boleh dilihat (opsi C)', async () => {
+  // kamera publik dengan koordinat
+  const pub = await api('/api/admin/cameras', {
+    method: 'POST', admin: true,
+    json: { name: 'Peta Publik', sourceType: 'hls', sourceUrl: 'http://127.0.0.1:18081/index.m3u8', lat: -7.81, lng: 110.36 },
+  })
+  assert.equal(pub.status, 201)
+  assert.equal(pub.body.lat, -7.81)
+
+  // kamera berkode dengan koordinat: TIDAK boleh muncul di katalog publik
+  const sec = await api('/api/admin/cameras', {
+    method: 'POST', admin: true,
+    json: { name: 'Peta Rahasia', sourceType: 'hls', sourceUrl: 'http://127.0.0.1:18081/index.m3u8', accessMode: 'protected', accessCode: 'peta-123', lat: -7.801234, lng: 110.123456 },
+  })
+  assert.equal(sec.status, 201)
+
+  const cat = await api('/api/catalog')
+  assert.ok(cat.body.cameras.find((c: any) => c.name === 'Peta Publik').lat === -7.81)
+  const hidden = cat.body.cameras.find((c: any) => c.name === 'Peta Rahasia')
+  assert.equal(hidden.lat, undefined, 'kamera berkode tidak boleh mengirim lat')
+  assert.equal(hidden.lng, undefined, 'kamera berkode tidak boleh mengirim lng')
+  assert.ok(!JSON.stringify(cat.body).includes('-7.801234'))
+
+  const detail = await api(`/api/cameras/${sec.body.id}`)
+  assert.equal(detail.body.lat, undefined, 'detail kamera berkode juga tidak boleh membocorkan lat')
+
+  // setelah unlock koordinat boleh tampil
+  const un = await api('/api/unlock', { method: 'POST', json: { kind: 'camera', id: sec.body.id, code: 'peta-123' } })
+  const cat2 = await api('/api/catalog', { grant: un.body.grant })
+  const shown = cat2.body.cameras.find((c: any) => c.name === 'Peta Rahasia')
+  assert.equal(shown.lat, -7.801234)
+  assert.equal(shown.lng, 110.123456)
+})
+
+test('koordinat: nilai di luar rentang ditolak', async () => {
+  const bad = await api('/api/admin/cameras', {
+    method: 'POST', admin: true,
+    json: { name: 'Salah Koor', sourceType: 'hls', sourceUrl: 'http://127.0.0.1:18081/index.m3u8', lat: 95, lng: 200 },
+  })
+  assert.equal(bad.status, 400)
+})

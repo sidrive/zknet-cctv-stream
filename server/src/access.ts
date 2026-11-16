@@ -27,6 +27,8 @@ export interface CameraRow {
   listed: number
   enabled: number
   sort: number
+  lat: number | null
+  lng: number | null
 }
 
 export const hashCode = (code: string) => bcrypt.hashSync(code, 10)

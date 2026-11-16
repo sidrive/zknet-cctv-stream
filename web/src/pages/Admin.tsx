@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent, useRef} from 'react'
 import { Link } from 'react-router-dom'
 import { admin, ApiError, type AdminCamera, type AdminCluster, type AdminSettings } from '../api'
 import Player from '../components/Player'
@@ -98,6 +98,7 @@ function Dashboard({ username, onLogout }: { username: string; onLogout: () => v
 const EMPTY_CAM = {
   name: '', description: '', location: '', clusterId: '' as string, sourceType: 'hls', sourceUrl: '',
   proxy: true, transcode: false, listed: true, enabled: true, sort: 0, accessMode: 'public', accessCode: '',
+  lat: '' as string, lng: '' as string,
 }
 const SOURCE_HELP: Record<string, string> = {
   hls: 'URL playlist HLS (.m3u8). Dengan "sembunyikan URL sumber" server menjadi proxy sehingga URL asli tidak sampai ke browser.',
@@ -153,10 +154,23 @@ function Cameras({ cameras, clusters, reload }: { cameras: AdminCamera[]; cluste
 }
 
 function CameraForm({ cam, clusters, onClose, onSaved }: { cam: AdminCamera | null; clusters: AdminCluster[]; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState(() => cam ? { ...EMPTY_CAM, ...cam, clusterId: cam.clusterId ?? '', accessCode: '' } : { ...EMPTY_CAM })
+  const [f, setF] = useState(() => cam ? { ...EMPTY_CAM, ...cam, clusterId: cam.clusterId ?? '', accessCode: '', lat: cam.lat != null ? String(cam.lat) : '', lng: cam.lng != null ? String(cam.lng) : '' } : { ...EMPTY_CAM })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [picking, setPicking] = useState(false)
+  const [locating, setLocating] = useState(false)
   const set = <K extends keyof typeof EMPTY_CAM>(k: K, v: (typeof EMPTY_CAM)[K]) => setF((x) => ({ ...x, [k]: v }))
+
+  // Ambil posisi dari browser (butuh HTTPS atau localhost). Berguna saat memasang kamera baru.
+  const useHere = () => {
+    if (!navigator.geolocation) { setError('Browser tidak mendukung geolokasi.'); return }
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setF((x) => ({ ...x, lat: pos.coords.latitude.toFixed(6), lng: pos.coords.longitude.toFixed(6) })); setLocating(false) },
+      (e) => { setError(`Gagal ambil lokasi: ${e.message}`); setLocating(false) },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -167,6 +181,8 @@ function CameraForm({ cam, clusters, onClose, onSaved }: { cam: AdminCamera | nu
         clusterId: f.clusterId || null, sourceType: f.sourceType, sourceUrl: f.sourceUrl,
         proxy: f.proxy, transcode: f.transcode, listed: f.listed, enabled: f.enabled, sort: Number(f.sort) || 0,
         accessMode: f.accessMode, accessCode: f.accessCode || undefined,
+        lat: f.lat.trim() === '' ? null : Number(f.lat),
+        lng: f.lng.trim() === '' ? null : Number(f.lng),
       })
       onSaved()
     } catch (err) { setError(errMsg(err)) } finally { setBusy(false) }
@@ -204,10 +220,82 @@ function CameraForm({ cam, clusters, onClose, onSaved }: { cam: AdminCamera | nu
           )}
           <label className="check"><input type="checkbox" checked={f.enabled} onChange={(e) => set('enabled', e.target.checked)} /> Aktif</label>
           <label className="check"><input type="checkbox" checked={f.listed} onChange={(e) => set('listed', e.target.checked)} /> Tampil di daftar (matikan = hanya via link langsung)</label>
+          <p className="muted small full" style={{margin: 0}}>Koordinat untuk Peta Lokasi. Kosongkan bila belum diketahui — kamera tanpa koordinat tidak digambar di peta (bukan di 0,0). Kamera berkode tetap menyembunyikan koordinatnya sampai dibuka.</p>
+          <label className="field"><span>Latitude</span><input inputMode="decimal" value={f.lat} onChange={(e) => set('lat', e.target.value)} placeholder="-7.93878" /></label>
+          <label className="field"><span>Longitude</span><input inputMode="decimal" value={f.lng} onChange={(e) => set('lng', e.target.value)} placeholder="110.24649" /></label>
+          <div className="row gap-s wrap full">
+            <button type="button" className="btn btn-sm" onClick={() => { setPicking(true) }}>Pilih dari peta…</button>
+            <button type="button" className="btn btn-sm" onClick={useHere} disabled={locating}>{locating ? 'Mencari…' : 'Lokasi saat ini'}</button>
+            {(f.lat || f.lng) && <button type="button" className="btn btn-sm btn-ghost" onClick={() => { set('lat', ''); set('lng', '') }}>Kosongkan</button>}
+          </div>
         </div>
         {error && <p className="error" role="alert">{error}</p>}
         <div className="row end"><button type="button" className="btn btn-ghost" onClick={onClose}>Batal</button><button className="btn btn-primary" disabled={busy}>Simpan</button></div>
       </form>
+      {picking && (
+        <CoordPicker
+          lat={f.lat ? Number(f.lat) : null}
+          lng={f.lng ? Number(f.lng) : null}
+          onClose={() => setPicking(false)}
+          onPick={(la, ln) => { setF((x) => ({ ...x, lat: la.toFixed(6), lng: ln.toFixed(6) })); setPicking(false) }}
+        />
+      )}
+    </div>
+  )
+}
+
+// Pemilih koordinat: klik peta untuk menaruh pin. Memakai MapLibre (dimuat malas agar
+// bundel admin tidak membengkak). Default tampilan DIY karena semua kamera di sana.
+const DIY_CENTER: [number, number] = [110.3695, -7.875]
+
+function CoordPicker({ lat, lng, onPick, onClose }: { lat: number | null; lng: number | null; onPick: (lat: number, lng: number) => void; onClose: () => void }) {
+  const box = useRef<HTMLDivElement>(null)
+  const [ready, setReady] = useState(false)
+  const [cur, setCur] = useState<{ lat: number; lng: number } | null>(lat != null && lng != null ? { lat, lng } : null)
+  const cb = useRef(onPick); cb.current = onPick
+  const mapRef = useRef<import('maplibre-gl').Map | null>(null)
+  const pinRef = useRef<import('maplibre-gl').Marker | null>(null)
+  const start = useRef(cur)
+
+  useEffect(() => {
+    let dead = false
+    import('../components/mapInit').then(async ({ createMap }) => {
+      if (dead || !box.current) return
+      const map = await createMap({ container: box.current, center: start.current ? [start.current.lng, start.current.lat] : DIY_CENTER, zoom: start.current ? 15 : 11 })
+      if (dead) { map.remove(); return }
+      mapRef.current = map
+      setReady(true)
+      map.on('click', (e) => {
+        const next = { lat: e.lngLat.lat, lng: e.lngLat.lng }
+        setCur(next)
+        // Pin harus terlihat, kalau tidak admin menebak titik yang dipilih.
+        import('maplibre-gl').then(({ Marker }) => {
+          if (!pinRef.current) pinRef.current = new Marker({ color: '#D4AF37' }).setLngLat([next.lng, next.lat]).addTo(map)
+          else pinRef.current.setLngLat([next.lng, next.lat])
+        })
+      })
+    })
+    return () => {
+      dead = true
+      pinRef.current?.remove(); pinRef.current = null
+      mapRef.current?.remove(); mapRef.current = null
+    }
+  }, [])
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal modal-wide">
+        <h2>Pilih lokasi kamera</h2>
+        <p className="muted small">Klik pada peta untuk menaruh pin, lalu tekan Pakai.</p>
+        <div ref={box} className="coord-picker-map" />
+        <div className="row between">
+          <code>{cur ? `${cur.lat.toFixed(6)}, ${cur.lng.toFixed(6)}` : 'belum dipilih'}</code>
+          <div className="row gap-s">
+            <button className="btn btn-ghost" onClick={onClose}>Batal</button>
+            <button className="btn btn-primary" disabled={!ready || !cur} onClick={() => cur && cb.current(cur.lat, cur.lng)}>Pakai koordinat</button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

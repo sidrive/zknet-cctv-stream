@@ -118,6 +118,9 @@ body.zk { margin: 0; background: var(--zk-grad-page); color: var(--zk-text);
   grid-template-columns: var(--zk-sidebar-w) 1fr;
   min-height: 100vh;
 }
+/* Halaman tanpa sidebar (mis. Status Jaringan): satu kolom penuh. */
+.zk-app--plain { grid-template-columns: 1fr; }
+.zk-app--plain .zk-main { max-width: 1280px; margin: 0 auto; width: 100%; }
 .zk-main { padding: var(--zk-s-4) var(--zk-s-6) var(--zk-s-6); display: grid; gap: var(--zk-gap); align-content: start; min-width: 0; }
 .zk-grid-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--zk-gap); }
 .zk-grid-split { display: grid; grid-template-columns: minmax(320px, 5fr) 7fr; gap: var(--zk-gap); align-items: start; }
@@ -267,7 +270,9 @@ body.zk { margin: 0; background: var(--zk-grad-page); color: var(--zk-text);
   padding: var(--zk-s-4) var(--zk-s-5);
   border-radius: var(--zk-r-lg); border: 1px solid var(--zk-border);
   background: var(--zk-surface-2); box-shadow: var(--zk-shadow-card);
+  min-width: 0;
 }
+.zk-stat > div:last-child { min-width: 0; }
 .zk-stat__icon { width: 62px; height: 62px; flex: none; border-radius: var(--zk-r-md); display: grid; place-items: center; color: #fff; }
 .zk-stat__icon .zk-icon { width: 30px; height: 30px; }
 .zk-stat__label { font-size: var(--zk-fs-sm); color: var(--zk-text); font-weight: var(--zk-fw-medium); }
@@ -279,7 +284,10 @@ body.zk { margin: 0; background: var(--zk-grad-page); color: var(--zk-text);
 .zk-stat--danger  .zk-stat__icon { background: linear-gradient(180deg, #f0606a, #c9323c); }
 .zk-stat--violet  .zk-stat__icon { background: linear-gradient(180deg, #8068ff, #5a41e0); }
 .zk-stat--status  { justify-content: space-between; }
+.zk-stat--status .zk-icon { color: var(--zk-text-muted); flex: none; }
 .zk-status-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--zk-success); box-shadow: 0 0 0 4px var(--zk-success-soft), 0 0 14px var(--zk-success); }
+.zk-status-dot[data-state="warn"] { background: var(--zk-danger); box-shadow: 0 0 0 4px rgba(232,69,79,.2), 0 0 14px var(--zk-danger); }
+.zk-status-dot[data-state="idle"] { background: var(--zk-warning); box-shadow: 0 0 0 4px rgba(245,184,61,.2), 0 0 14px var(--zk-warning); }
 
 /* Item daftar cluster */
 .zk-list-item {
@@ -592,7 +600,7 @@ body.zk { margin: 0; background: var(--zk-grad-page); color: var(--zk-text);
 
   /* Stats Grid */
   .zk-grid-stats {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--zk-s-2);
   }
   .zk-stat {
@@ -685,6 +693,7 @@ body.zk { margin: 0; background: var(--zk-grad-page); color: var(--zk-text);
   .zk-grid-cams {
     grid-template-columns: 1fr;
   }
+  .zk-grid-stats { grid-template-columns: 1fr; }
   .zk-list-item {
     padding: var(--zk-s-2);
     gap: var(--zk-s-2);
@@ -694,4 +703,25 @@ body.zk { margin: 0; background: var(--zk-grad-page); color: var(--zk-text);
     height: 52px;
     font-size: 1rem;
   }
+}
+
+/* ---------- Tambahan: halaman Status Jaringan & util ---------- */
+.zk-page { padding: var(--zk-s-6); max-width: 1280px; margin: 0 auto; width: 100%; }
+.zk-crumbs { margin-bottom: var(--zk-s-4); }
+.zk-stat__unit { font-size: var(--zk-fs-sm); font-weight: var(--zk-fw-medium); color: var(--zk-text-muted); }
+.zk-text-sm.zk-muted, .zk-muted { color: var(--zk-text-muted); }
+.zk-dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--zk-s-4); margin: 0 0 var(--zk-s-4); }
+.zk-dl dt { font-size: var(--zk-fs-sm); color: var(--zk-text-muted); }
+.zk-dl dd { margin: 2px 0 0; font-weight: var(--zk-fw-bold); font-size: var(--zk-fs-lg); }
+
+@media (max-width: 720px) {
+  .zk-page { padding: var(--zk-s-4); }
+  .zk-dl { grid-template-columns: 1fr 1fr; }
+}
+
+/* Halaman tanpa sidebar: .zk-main sudah memberi padding, jadi .zk-page hanya mengatur lebar. */
+.zk-app--plain .zk-page { padding: 0; max-width: none; width: 100%; min-width: 0; }
+
+@media (max-width: 360px) {
+  .zk-app--plain .zk-main { padding-left: var(--zk-s-3); padding-right: var(--zk-s-3); }
 }

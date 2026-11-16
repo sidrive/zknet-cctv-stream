@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './zknet-ds.css'
 import './styles.css'
+import './map.css'
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

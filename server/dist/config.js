@@ -16,4 +16,8 @@ export const config = {
     ffmpegIdleSeconds: Number(env.FFMPEG_IDLE_SECONDS ?? 30),
     trustProxy: env.TRUST_PROXY === '1' || env.TRUST_PROXY === 'true',
     cookieSecure: env.COOKIE_SECURE === '1' || env.COOKIE_SECURE === 'true',
+    // Probe kesehatan sumber kamera (online/offline). Set 0 untuk mematikan.
+    probeCacheSeconds: Number(env.PROBE_CACHE_SECONDS ?? 60),
+    probeTimeoutMs: Number(env.PROBE_TIMEOUT_MS ?? 4000),
+    probeConcurrency: Math.max(1, Number(env.PROBE_CONCURRENCY ?? 5)),
 };

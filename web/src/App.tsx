@@ -4,7 +4,10 @@ import Home from './pages/Home'
 import ClusterPage from './pages/ClusterPage'
 import Watch from './pages/Watch'
 import Embed from './pages/Embed'
+import Status from './pages/Status'
 const Admin = lazy(() => import('./pages/Admin'))
+// MapLibre besar (~1 MB); dimuat hanya saat halaman peta dibuka.
+const MapPage = lazy(() => import('./pages/MapPage'))
 
 export default function App() {
   return (
@@ -12,6 +15,8 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/c/:slug" element={<ClusterPage />} />
       <Route path="/v/:id" element={<Watch />} />
+      <Route path="/status" element={<Status />} />
+      <Route path="/peta" element={<Suspense fallback={<div className="zk-app zk-app--plain"><main className="zk-main"><p className="muted">Memuat peta…</p></main></div>}><MapPage /></Suspense>} />
       <Route path="/embed" element={<Embed />} />
       <Route path="/admin/*" element={<Suspense fallback={null}><Admin /></Suspense>} />
       <Route path="*" element={<div className="container page"><p>Halaman tidak ditemukan.</p></div>} />

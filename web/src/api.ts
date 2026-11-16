@@ -33,10 +33,20 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 
 export interface Site { site_title: string; site_description: string }
 export interface Cluster { id: string; slug: string; name: string; description: string; locked: boolean; unlocked: boolean; cameraCount: number }
-export interface Camera { id: string; name: string; description: string; location: string; clusterId: string | null; type: string; locked: boolean; unlocked: boolean }
-export interface Catalog { site: Site; clusters: Cluster[]; cameras: Camera[] }
+export interface Camera { id: string; name: string; description: string; location: string; clusterId: string | null; type: string; locked: boolean; unlocked: boolean; status: CameraStatus; lat?: number | null; lng?: number | null }
+export type CameraStatus = 'online' | 'offline' | 'unknown'
+export interface Catalog { site: Site; clusters: Cluster[]; cameras: Camera[]; lastCheckAt: number | null }
 export interface CameraDetail extends Omit<Camera, 'clusterId'> {
   cluster: { id: string; slug: string; name: string; locked: boolean; unlocked: boolean } | null
+}
+export interface HealthDetail {
+  ok: boolean
+  uptimeSeconds: number
+  cameras: { total: number; enabled: number; online: number; offline: number; unknown: number }
+  clusters: number
+  transcoders: number
+  lastCheckAt: number | null
+  problems: { id: string; name: string; checkedAt: number | null }[]
 }
 export interface Session { type: 'hls' | 'mjpeg' | 'embed'; url: string }
 
@@ -44,6 +54,8 @@ export const api = {
   catalog: () => req<Catalog>('GET', '/api/catalog'),
   camera: (id: string) => req<CameraDetail>('GET', `/api/cameras/${id}`),
   session: (id: string) => req<Session>('POST', `/api/cameras/${id}/session`),
+  health: () => req<HealthDetail>('GET', '/api/health/detail'),
+  refreshHealth: () => req<{ ok: boolean; lastCheckAt: number | null }>('POST', '/api/health/refresh'),
   async unlock(kind: 'cluster' | 'camera', id: string, code: string) {
     const r = await req<{ grant: string }>('POST', '/api/unlock', { kind, id, code, grant: currentGrant() || undefined })
     setGrant(r.grant)
@@ -56,6 +68,7 @@ export interface AdminCamera {
   id: string; name: string; description: string; location: string; clusterId: string | null
   sourceType: 'hls' | 'mjpeg' | 'rtsp' | 'embed'; sourceUrl: string; proxy: boolean; transcode: boolean
   listed: boolean; enabled: boolean; sort: number; accessMode: 'public' | 'protected'; hasCode: boolean
+  lat: number | null; lng: number | null
 }
 export interface AdminSettings {
   site_title: string; site_description: string; embed_origins: string; grant_ttl_hours: string

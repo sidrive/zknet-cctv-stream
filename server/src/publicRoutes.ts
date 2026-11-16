@@ -9,9 +9,13 @@ import {
 } from './access.js'
 import { adminFromRequest } from './auth.js'
 import { db, embedApiKey, getSetting, PUBLIC_SETTING_KEYS } from './db.js'
+import { ffmpeg } from './ffmpeg.js'
+import { getAllProbes, lastCheckAt, refreshProbes, type CameraStatus } from './health.js'
 import { signStreamToken } from './streams.js'
 
 export const publicRouter = Router()
+
+const startedAt = Date.now()
 
 const unlockLimiter = rateLimit({
   windowMs: 60_000,
@@ -23,6 +27,43 @@ const unlockLimiter = rateLimit({
 
 publicRouter.get('/health', (_req, res) => res.json({ ok: true }))
 
+/**
+ * Ringkasan kesehatan sistem untuk kartu "Layanan ZKNet" dan halaman Status Jaringan.
+ * Angka online/offline berasal dari probe latar belakang (lihat health.ts); bila belum
+ * pernah diprobe, statusnya "unknown" — jangan ditampilkan sebagai hijau.
+ */
+publicRouter.get('/health/detail', (_req, res) => {
+  const rows = db
+    .prepare('SELECT id, name, cluster_id, source_type, enabled FROM cameras')
+    .all() as Pick<CameraRow, 'id' | 'name' | 'cluster_id' | 'source_type' | 'enabled'>[]
+  const probes = getAllProbes()
+  const counts: Record<CameraStatus, number> = { online: 0, offline: 0, unknown: 0 }
+  for (const cam of rows) {
+    const s = cam.enabled ? (probes[cam.id]?.status ?? 'unknown') : 'unknown'
+    counts[s === 'offline' ? 'offline' : s === 'online' ? 'online' : 'unknown']++
+  }
+  const problems = rows
+    .filter((cam) => probes[cam.id]?.status === 'offline')
+    .map((cam) => ({ id: cam.id, name: cam.name, checkedAt: probes[cam.id]!.checkedAt }))
+
+  res.json({
+    ok: counts.offline === 0 || counts.online > 0,
+    uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
+    cameras: { total: rows.length, enabled: rows.filter((c) => c.enabled).length, ...counts },
+    clusters: (db.prepare('SELECT COUNT(*) n FROM clusters').get() as { n: number }).n,
+    transcoders: ffmpeg.activeCount(),
+    lastCheckAt: lastCheckAt(),
+    problems,
+  })
+})
+
+/** Picu probe segera (dipakai tombol "Cek ulang" di halaman Status). */
+publicRouter.post('/health/refresh', async (_req, res) => {
+  await refreshProbes(true)
+  res.json({ ok: true, lastCheckAt: lastCheckAt() })
+})
+
+
 // Katalog yang aman ditampilkan: tanpa URL sumber & tanpa hash kode.
 publicRouter.get('/catalog', (req, res) => {
   const g = adminFromRequest(req) ? null : grantsFromRequest(req)
@@ -32,6 +73,7 @@ publicRouter.get('/catalog', (req, res) => {
     .all() as CameraRow[]
   const byCluster = new Map<string, ClusterRow>(clusters.map((c) => [c.id, c]))
   const open = (c: ClusterRow | undefined) => (g === null ? true : clusterOpen(c, g))
+  const probes = getAllProbes()
 
   const outClusters = clusters.map((c) => ({
     id: c.id,
@@ -53,9 +95,15 @@ publicRouter.get('/catalog', (req, res) => {
       type: cam.source_type,
       locked: cam.access_mode === 'protected',
       unlocked: g === null ? true : cameraOpen(cam, g),
+      status: probes[cam.id]?.status ?? ('unknown' as CameraStatus),
+      // Opsi C: koordinat hanya untuk kamera yang memang boleh dilihat. Kamera berkode
+      // tidak pernah mengirim lat/lng supaya lokasinya tidak bocor lewat "view source".
+      ...(g === null || (clusterOpen(cam.cluster_id ? byCluster.get(cam.cluster_id) : undefined, g) && cameraOpen(cam, g))
+        ? { lat: cam.lat, lng: cam.lng }
+        : {}),
     }))
   const site = Object.fromEntries(PUBLIC_SETTING_KEYS.map((k) => [k, getSetting(k)]))
-  res.json({ site, clusters: outClusters, cameras: outCameras })
+  res.json({ site, clusters: outClusters, cameras: outCameras, lastCheckAt: lastCheckAt() })
 })
 
 // Detail satu kamera (untuk link langsung / embed, termasuk kamera yang tidak "listed").
@@ -70,11 +118,13 @@ publicRouter.get('/cameras/:id', (req, res) => {
     description: cam.description,
     location: cam.location,
     type: cam.source_type,
+    status: getAllProbes()[cam.id]?.status ?? 'unknown',
     cluster: cluster
       ? { id: cluster.id, slug: cluster.slug, name: cluster.name, locked: cluster.access_mode === 'protected', unlocked: g === null ? true : clusterOpen(cluster, g) }
       : null,
     locked: cam.access_mode === 'protected',
     unlocked: g === null ? true : cameraOpen(cam, g),
+    ...(g === null || (clusterOpen(cluster, g) && cameraOpen(cam, g)) ? { lat: cam.lat, lng: cam.lng } : {}),
   })
 })
 

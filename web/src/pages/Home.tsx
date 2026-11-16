@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import UnlockDialog from '../components/UnlockDialog'
 import { useCatalog } from '../hooks'
+import { cameraBadge, formatChecked } from '../status'
 import type { Camera, Cluster } from '../api'
 
 export default function Home() {
@@ -29,6 +30,9 @@ export default function Home() {
     return [...clusterCameras, ...loose].filter((camera) => !term || match(camera.name) || match(camera.location)).slice(0, 9)
   }, [data, featuredCluster, loose, term])
   const protectedCount = data?.cameras.filter((camera) => camera.locked).length ?? 0
+  const onlineCount = data?.cameras.filter((camera) => camera.status === 'online').length ?? 0
+  const offlineCount = data?.cameras.filter((camera) => camera.status === 'offline').length ?? 0
+  const uncheckedCount = data?.cameras.filter((camera) => (camera.status ?? 'unknown') === 'unknown').length ?? 0
 
   if (error) return <div className="page"><p className="error">{error}</p></div>
   if (!data) return <div className="page"><p className="muted">Memuat…</p></div>
@@ -53,8 +57,8 @@ export default function Home() {
           <a className="zk-nav__item is-active" href="#dashboard" onClick={closeMenu}><svg className="zk-icon"><use href="#i-home"/></svg>Dashboard</a>
           <a className="zk-nav__item" href="#cctv-publik" onClick={closeMenu}><svg className="zk-icon"><use href="#i-cam"/></svg>CCTV Publik</a>
           <a className="zk-nav__item" href="#cluster" onClick={closeMenu}><svg className="zk-icon"><use href="#i-users"/></svg>Cluster</a>
-          <a className="zk-nav__item" href="#cctv-publik" onClick={closeMenu}><svg className="zk-icon"><use href="#i-map"/></svg>Peta Lokasi</a>
-          <a className="zk-nav__item" href="#status" onClick={closeMenu}><svg className="zk-icon"><use href="#i-signal"/></svg>Status Jaringan</a>
+          <Link className="zk-nav__item" to="/peta" onClick={closeMenu}><svg className="zk-icon"><use href="#i-map"/></svg>Peta Lokasi</Link>
+          <Link className="zk-nav__item" to="/status" onClick={closeMenu}><svg className="zk-icon"><use href="#i-signal"/></svg>Status Jaringan</Link>
           <Link className="zk-nav__item" to="/admin" onClick={closeMenu}><svg className="zk-icon"><use href="#i-gear"/></svg>Pengaturan</Link>
         </nav>
         <div className="zk-sidebar__footer zk-promo-side">
@@ -100,11 +104,18 @@ export default function Home() {
 
         <div className="zk-grid-stats" id="status">
           <div className="zk-stat zk-stat--primary"><div className="zk-stat__icon"><svg className="zk-icon"><use href="#i-cam"/></svg></div><div><div className="zk-stat__label">Total Kamera</div><div className="zk-stat__value">{data.cameras.length}</div></div></div>
-          <div className="zk-stat zk-stat--success"><div className="zk-stat__icon"><svg className="zk-icon"><use href="#i-radio"/></svg></div><div><div className="zk-stat__label">Online</div><div className="zk-stat__value">{data.cameras.length - protectedCount}</div></div></div>
-          <div className="zk-stat zk-stat--danger"><div className="zk-stat__icon"><svg className="zk-icon"><use href="#i-radio"/></svg></div><div><div className="zk-stat__label">Perlu Kode</div><div className="zk-stat__value">{protectedCount}</div></div></div>
-          <div className="zk-stat zk-stat--violet"><div className="zk-stat__icon"><svg className="zk-icon"><use href="#i-users"/></svg></div><div><div className="zk-stat__label">Total Cluster</div><div className="zk-stat__value">{data.clusters.length}</div></div></div>
-          <div className="zk-stat zk-stat--status"><div style={{display:'flex',gap:'12px',alignItems:'center'}}><span className="zk-status-dot"></span><div><div className="zk-text-sm">Layanan ZKNet</div><div style={{color:'var(--zk-success)',fontWeight:700}}>Normal</div></div></div></div>
+          <div className="zk-stat zk-stat--success"><div className="zk-stat__icon"><svg className="zk-icon"><use href="#i-radio"/></svg></div><div><div className="zk-stat__label">Online</div><div className="zk-stat__value">{onlineCount}</div></div></div>
+          <div className="zk-stat zk-stat--danger"><div className="zk-stat__icon"><svg className="zk-icon"><use href="#i-radio"/></svg></div><div><div className="zk-stat__label">Offline</div><div className="zk-stat__value">{offlineCount}</div></div></div>
+          <div className="zk-stat zk-stat--violet"><div className="zk-stat__icon"><svg className="zk-icon"><use href="#i-lock"/></svg></div><div><div className="zk-stat__label">Perlu Kode</div><div className="zk-stat__value">{protectedCount}</div></div></div>
+          <Link className={`zk-stat zk-stat--status ${offlineCount > 0 ? 'zk-stat--danger' : ''}`} to="/status">
+            <div style={{display:'flex',gap:'12px',alignItems:'center'}}>
+              <span className="zk-status-dot" data-state={offlineCount > 0 ? 'warn' : uncheckedCount > 0 ? 'idle' : 'ok'}></span>
+              <div><div className="zk-text-sm">Status Jaringan</div><div style={{fontWeight:700}}>{offlineCount > 0 ? `${offlineCount} kamera offline` : uncheckedCount > 0 ? 'Memeriksa…' : 'Semua normal'}</div></div>
+            </div>
+            <svg className="zk-icon"><use href="#i-chev"/></svg>
+          </Link>
         </div>
+        {data.lastCheckAt && <p className="zk-text-sm zk-muted" style={{margin:'-0.5rem 0 0'}}>Status kamera terakhir diperiksa {formatChecked(data.lastCheckAt)}.</p>}
 
         <div className="zk-grid-split">
           <div className="zk-stack">
@@ -211,12 +222,12 @@ function ClusterRow({ cluster, onOpen, index = 0 }: { cluster: Cluster; onOpen: 
 }
 
 function DashboardCameraCard({ camera, onOpen, index = 0 }: { camera: Camera; onOpen: () => void; index?: number }) {
-  const locked = camera.locked && !camera.unlocked
   const phClass = `ph${(index % 4) + 1}`
+  const badge = cameraBadge(camera)
   return (
-    <div className={`zk-cam ${phClass}`} onClick={onOpen} role="button" tabIndex={0} style={{cursor: 'pointer'}}>
-      <span className="zk-badge zk-badge--live">LIVE</span>
-      {locked && (
+    <div className={`zk-cam ${phClass}${camera.status === 'offline' ? ' zk-cam--offline' : ''}`} onClick={onOpen} role="button" tabIndex={0} style={{cursor: 'pointer'}}>
+      <span className={`zk-badge ${badge.cls}`}>{badge.text}</span>
+      {camera.locked && !camera.unlocked && (
         <span className="zk-badge zk-badge--locked" style={{position: 'absolute', top: 8, right: 8, zIndex: 1}}>
           <svg className="zk-icon" style={{width: 12, height: 12}}><use href="#i-lock"/></svg> Berkode
         </span>
@@ -230,7 +241,7 @@ function DashboardCameraCard({ camera, onOpen, index = 0 }: { camera: Camera; on
 }
 
 function DashboardCameraRow({ camera, onOpen }: { camera: Camera; onOpen: () => void }) {
-  const locked = camera.locked && !camera.unlocked
+  const badge = cameraBadge(camera)
   return (
     <div className="zk-cam-row" onClick={onOpen} role="button" tabIndex={0}>
       <div className="zk-cam-row__info">
@@ -240,9 +251,7 @@ function DashboardCameraRow({ camera, onOpen }: { camera: Camera; onOpen: () => 
           {camera.location && <div className="zk-cam-row__loc">{camera.location}</div>}
         </div>
       </div>
-      <span className={`zk-badge ${locked ? 'zk-badge--locked' : 'zk-badge--live'}`}>
-        {locked ? 'Berkode' : 'LIVE'}
-      </span>
+      <span className={`zk-badge ${badge.cls}`}>{badge.text}</span>
     </div>
   )
 }

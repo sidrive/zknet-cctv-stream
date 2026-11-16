@@ -10,6 +10,7 @@ import { adminRouter } from './adminRoutes.js'
 import { publicRouter } from './publicRoutes.js'
 import { streamRouter } from './streams.js'
 import { ffmpeg } from './ffmpeg.js'
+import { refreshProbes } from './health.js'
 
 const app = express()
 app.disable('x-powered-by')
@@ -28,6 +29,10 @@ app.use((req, res, next) => {
     [
       "default-src 'self'",
       "script-src 'self'",
+      // MapLibre membuat Web Worker dari blob URL untuk merender tile vektor.
+      // Tanpa worker-src, aturan jatuh ke default-src 'self' dan worker diblokir
+      // (peta tampil hitam tanpa jalan).
+      "worker-src 'self' blob:",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: http: https:",
       "media-src 'self' blob: http: https:",
@@ -70,7 +75,21 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 const server = app.listen(config.port, () => {
   console.log(`CCTV stream hub berjalan di http://localhost:${config.port}`)
 })
+
+// Probe kesehatan sumber kamera: sekali saat start, lalu tiap interval cache.
+// Dijalankan di latar belakang agar request katalog tidak ikut menunggu.
+let probeTimer: NodeJS.Timeout | undefined
+if (config.probeCacheSeconds > 0) {
+  const tick = () => {
+    refreshProbes().catch((e) => console.error('probe gagal:', e instanceof Error ? e.message : e))
+  }
+  setTimeout(tick, 2000).unref()
+  probeTimer = setInterval(tick, config.probeCacheSeconds * 1000)
+  probeTimer.unref()
+}
+
 const shutdown = () => {
+  if (probeTimer) clearInterval(probeTimer)
   ffmpeg.stopAll()
   server.close(() => process.exit(0))
   setTimeout(() => process.exit(0), 3000).unref()
