@@ -50,6 +50,32 @@ Data persisten di volume `cctv-data`. Pasang di belakang reverse proxy HTTPS lal
 
 ## Deploy ke STB Armbian (PM2 + Cloudflare Tunnel)
 
+### Peta: API key CARTO
+
+Halaman `/peta` memakai tile CARTO. Sejak 25 September 2026 raster tanpa key tidak lagi
+dilayani, jadi **key wajib ada saat build**.
+
+```bash
+cp web/.env.example web/.env.production   # lalu isi VITE_CARTO_API_KEY
+npm run build                             # key ditanam ke web/dist
+```
+
+Key ini **tanpa batasan domain** (pilihan sadar), supaya peta tetap tampil dari dua jalur:
+
+| Akses | Keterangan |
+|---|---|
+| `https://cctv.domain.com` | lewat Cloudflare Tunnel — publik |
+| `http://<ip-zerotier>:<port>` | lewat ZeroTier — internal |
+
+Kalau key dibatasi ke domain saja, CARTO membalas **403** untuk jalur ZeroTier dan peta
+menjadi kosong. Catatan: "Allowed IPs" di dashboard CARTO tidak menolong untuk ZeroTier —
+yang dinilai adalah IP publik pengunjung, sedangkan IP ZeroTier (`10.147.x.x`) privat dan
+tidak pernah terlihat oleh CARTO.
+
+Konsekuensi yang diterima: key tertanam di `web/dist` yang di-commit, jadi ikut terlihat di
+repo publik. Kuota gratis 1 juta permintaan/bulan per key dan bisa dipantau di dashboard
+CARTO. Bila key disalahgunakan, buat key baru lalu build ulang.
+
 Pola sama dengan app STB lain (`omni-invest-dashboard`, `landingpage-zknet-frontend`): build di luar STB, `dist/` di-commit, STB hanya `git pull`; Node dijaga PM2; domain lewat Cloudflare Tunnel yang sudah ada. Express melayani web + API + stream sekaligus, jadi **tidak perlu container nginx**.
 
 ### 1. Rilis (laptop/sandbox)
