@@ -1,5 +1,6 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
+import AppShell from './components/AppShell'
 import Home from './pages/Home'
 import ClusterPage from './pages/ClusterPage'
 import Watch from './pages/Watch'
@@ -12,18 +13,55 @@ const MapPage = lazy(() => import('./pages/MapPage'))
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <ScrollToHash />
+      <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/c/:slug" element={<ClusterPage />} />
       <Route path="/v/:id" element={<Watch />} />
       <Route path="/status" element={<Status />} />
       <Route path="/cluster" element={<Clusters />} />
-      <Route path="/peta" element={<Suspense fallback={<div className="zk-app zk-app--plain"><main className="zk-main"><p className="muted">Memuat peta…</p></main></div>}><MapPage /></Suspense>} />
+      <Route path="/peta" element={<Suspense fallback={<AppShell title="Peta Lokasi"><p className="muted">Memuat peta…</p></AppShell>}><MapPage /></Suspense>} />
       <Route path="/embed" element={<Embed />} />
       <Route path="/admin/*" element={<Suspense fallback={null}><Admin /></Suspense>} />
       <Route path="*" element={<NotFound />} />
-    </Routes>
+      </Routes>
+    </>
   )
+}
+
+/**
+ * Navigasi memakai anchor di beranda (`/#cctv-publik`) supaya menu "CCTV Publik"
+ * dan "Cluster" bisa dipakai dari halaman mana pun. Router tidak menggulir sendiri,
+ * jadi gulirannya dilakukan di sini setelah halaman tujuan terpasang.
+ */
+function ScrollToHash() {
+  const { hash, pathname } = useLocation()
+  useEffect(() => {
+    if (!hash) { window.scrollTo({ top: 0 }); return }
+    const id = hash.slice(1)
+    let tries = 0
+    let timer = 0
+    // Bagian tujuan baru ada setelah katalog selesai dimuat, jadi coba beberapa kali
+    // sebelum menyerah (kalau tidak, tautan menu dari halaman lain tidak menggulir).
+    const attempt = () => {
+      const el = document.getElementById(id)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        // Katalog & gambar masih dimuat sesudah ini dan bisa menggeser tata letak,
+        // jadi posisi dikoreksi sekali lagi setelah semuanya tenang.
+        timer = window.setTimeout(() => {
+          const again = document.getElementById(id)
+          if (again && Math.abs(again.getBoundingClientRect().top) > 8) again.scrollIntoView({ block: 'start' })
+        }, 700)
+        return
+      }
+      if (++tries < 25) timer = window.setTimeout(attempt, 120)
+    }
+    attempt()
+    return () => window.clearTimeout(timer)
+  }, [hash, pathname])
+  return null
 }
 
 /**
@@ -34,10 +72,8 @@ export default function App() {
 function NotFound() {
   const { pathname } = useLocation()
   return (
-    <div className="zk-app zk-app--plain">
-      <main className="zk-main">
+    <AppShell title="Halaman tidak ditemukan">
         <div className="zk-page">
-          <nav className="zk-crumbs"><Link to="/" className="zk-link">← Beranda</Link></nav>
           <h1 className="zk-h2" style={{ marginBottom: '0.5rem' }}>Halaman tidak ditemukan</h1>
           <p className="zk-text-sm zk-muted" style={{ marginBottom: '1rem' }}>
             Alamat <code>{pathname}</code> tidak ada di aplikasi ini. Mungkin tautannya sudah berubah.
@@ -48,7 +84,6 @@ function NotFound() {
             <Link className="zk-btn zk-btn--ghost zk-btn--sm" to="/peta">Buka Peta</Link>
           </p>
         </div>
-      </main>
-    </div>
+    </AppShell>
   )
 }

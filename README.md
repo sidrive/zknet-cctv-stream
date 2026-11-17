@@ -8,6 +8,7 @@ Hub streaming CCTV: **landing page publik**, **panel admin**, akses **gratis ata
 
 | Area | Detail |
 |---|---|
+| Navigasi | Satu kerangka (`web/src/components/AppShell.tsx`) untuk semua halaman publik: sidebar dengan item aktif otomatis, topbar, dan drawer di ponsel. Halaman peta/status/cluster tidak lagi kehilangan menu |
 | Landing page | Daftar cluster & kamera umum, pencarian, halaman cluster (daftar / *mode dinding* 2×2–4×4 dengan paginasi), halaman tonton per kamera |
 | Mode dinding | Pilihan grid & halaman tersimpan di URL (`/c/<slug>?wall=3x3&page=2`) sehingga bisa di-refresh atau dibagikan; hanya halaman aktif yang memuat stream |
 | Akses | Per **kamera** dan per **cluster**: `Gratis` atau `Perlu kode`. Kode disimpan terenkripsi + hash bcrypt, bisa dicabut seketika (lihat *Kode akses* di bawah), percobaan dibatasi (rate limit) |

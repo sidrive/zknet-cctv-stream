@@ -118,9 +118,6 @@ body.zk { margin: 0; background: var(--zk-grad-page); color: var(--zk-text);
   grid-template-columns: var(--zk-sidebar-w) 1fr;
   min-height: 100vh;
 }
-/* Halaman tanpa sidebar (mis. Status Jaringan): satu kolom penuh. */
-.zk-app--plain { grid-template-columns: 1fr; }
-.zk-app--plain .zk-main { max-width: 1280px; margin: 0 auto; width: 100%; }
 .zk-main { padding: var(--zk-s-4) var(--zk-s-6) var(--zk-s-6); display: grid; gap: var(--zk-gap); align-content: start; min-width: 0; }
 .zk-grid-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--zk-gap); }
 .zk-grid-split { display: grid; grid-template-columns: minmax(320px, 5fr) 7fr; gap: var(--zk-gap); align-items: start; }
@@ -776,9 +773,9 @@ body.zk { margin: 0; background: var(--zk-grad-page); color: var(--zk-text);
   .zk-dl { grid-template-columns: 1fr 1fr; }
 }
 
-/* Halaman tanpa sidebar: .zk-main sudah memberi padding, jadi .zk-page hanya mengatur lebar. */
-.zk-app--plain .zk-page { padding: 0; max-width: none; width: 100%; min-width: 0; }
+/* .zk-main sudah memberi padding, jadi .zk-page hanya mengatur lebar. */
+.zk-page { padding: 0; max-width: none; width: 100%; min-width: 0; }
 
 @media (max-width: 360px) {
-  .zk-app--plain .zk-main { padding-left: var(--zk-s-3); padding-right: var(--zk-s-3); }
+  .zk-main { padding-left: var(--zk-s-3); padding-right: var(--zk-s-3); }
 }

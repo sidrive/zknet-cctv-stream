@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import AppShell from '../components/AppShell'
 import CameraTile from '../components/CameraTile'
 import Player from '../components/Player'
 import UnlockDialog from '../components/UnlockDialog'
@@ -27,10 +28,10 @@ export default function ClusterPage() {
   // Dibaca langsung dari URL, jadi kondisi "mode dinding" tidak pernah basi.
   const [params, setParams] = useSearchParams()
 
-  if (error) return <div className="page"><p className="error">{error}</p></div>
-  if (!data) return <div className="page"><p className="muted">Memuat…</p></div>
+  if (error) return <AppShell title="Cluster"><p className="error">{error}</p></AppShell>
+  if (!data) return <AppShell title="Cluster"><p className="muted">Memuat…</p></AppShell>
   const cluster = data.clusters.find((c) => c.slug === slug)
-  if (!cluster) return <div className="container page"><p>Cluster tidak ditemukan. <Link to="/">Kembali</Link></p></div>
+  if (!cluster) return <AppShell title="Cluster"><p>Cluster tidak ditemukan. <Link to="/">Kembali</Link></p></AppShell>
 
   if (cluster.locked && !cluster.unlocked) {
     return (
@@ -74,23 +75,17 @@ export default function ClusterPage() {
   const lockedCam = cams.find((c) => c.id === unlockCam)
 
   return (
-    <main className="container page">
-      <nav className="crumbs"><Link to="/">← {data.site.site_title}</Link></nav>
-      <div className="row between wrap">
-        <div>
-          <h1>{cluster.name}</h1>
-          {cluster.description && <p className="muted">{cluster.description}</p>}
-          <p className="muted small" style={{ margin: 0 }}>
-            {openCams.length} dari {cams.length} kamera bisa ditonton
-            {lockedCount > 0 ? ` · ${lockedCount} perlu kode` : ''}
-          </p>
-        </div>
-        {openCams.length > 1 && (
-          <button className="btn" onClick={() => go({ wall: wall ? null : size })}>
-            {wall ? 'Tampilan daftar' : 'Mode dinding'}
-          </button>
-        )}
-      </div>
+    <AppShell
+      title={cluster.name}
+      subtitle={[cluster.description, `${openCams.length} dari ${cams.length} kamera bisa ditonton${lockedCount > 0 ? ` · ${lockedCount} perlu kode` : ''}`].filter(Boolean).join(' · ')}
+      actions={openCams.length > 1 ? (
+        <button className="zk-btn zk-btn--sm zk-btn--primary" onClick={() => go({ wall: wall ? null : size })}>
+          {wall ? 'Tampilan daftar' : 'Mode dinding'}
+        </button>
+      ) : undefined}
+    >
+      <div className="zk-page">
+        <nav className="zk-crumbs"><Link className="zk-link" to="/cluster">← Semua cluster</Link></nav>
 
       {wall ? (
         <>
@@ -138,10 +133,11 @@ export default function ClusterPage() {
         <p className="muted">Belum ada kamera di cluster ini.</p>
       )}
 
+      </div>
       {lockedCam && (
         <UnlockDialog kind="camera" id={lockedCam.id} title={lockedCam.name} onClose={() => setUnlockCam(null)}
           onUnlocked={() => { setUnlockCam(null); reload(); nav(`/v/${lockedCam.id}`) }} />
       )}
-    </main>
+    </AppShell>
   )
 }

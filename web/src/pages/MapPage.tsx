@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Player from '../components/Player'
+import AppShell from '../components/AppShell'
 import MapView from '../components/MapView'
 import { useCatalog } from '../hooks'
 import { STATUS_LABEL } from '../status'
@@ -34,8 +35,8 @@ export default function MapPage() {
   )
   const offline = withCoords.filter((c) => c.status === 'offline').length
 
-  if (error) return <div className="zk-app zk-app--plain"><main className="zk-main"><p className="error">{error}</p><Link to="/">← Kembali</Link></main></div>
-  if (!data) return <div className="zk-app zk-app--plain"><main className="zk-main"><p className="muted">Memuat…</p></main></div>
+  if (error) return <AppShell title="Peta Lokasi"><p className="error">{error}</p><Link className="zk-link" to="/">← Kembali</Link></AppShell>
+  if (!data) return <AppShell title="Peta Lokasi"><p className="muted">Memuat peta…</p></AppShell>
 
   const pick = (c: Camera) => { setSelectedId(c.id); setQ('') }
   // Saat cluster berganti, pilihan kamera direset agar panel detail tidak
@@ -43,17 +44,12 @@ export default function MapPage() {
   const changeCluster = (id: string) => { setCluster(id); setSelectedId(null); setQ('') }
 
   return (
-    <div className="zk-app zk-app--plain">
-      <main className="zk-main os-page">
+    <AppShell
+      title="Peta Lokasi"
+      subtitle={`${activeChip ? `${activeChip.name} · ` : ''}${withCoords.length} kamera berkoordinat${offline ? ` · ${offline} offline` : ''}`}
+    >
+      <div className="os-page">
         <div className="os-topbar">
-          <Link to="/" className="os-back" aria-label="Kembali">←</Link>
-          <div className="os-title">
-            <strong>PETA LOKASI</strong>
-            <span>
-              {activeChip ? `${activeChip.name} · ` : ''}
-              {withCoords.length} kamera berkoordinat{offline ? ` · ${offline} offline` : ''}
-            </span>
-          </div>
           <div className="os-chips" role="group" aria-label="Filter cluster">
             <button className={cluster === '' ? 'is-on' : ''} onClick={() => changeCluster('')} aria-pressed={cluster === ''}>
               Semua<em>{allCoords.length}</em>
@@ -116,7 +112,7 @@ export default function MapPage() {
             </aside>
           )}
         </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }

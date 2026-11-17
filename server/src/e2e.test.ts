@@ -625,3 +625,20 @@ test('urut ulang kamera: satu permintaan menentukan urutan persis walau sort sem
   assert.equal((await api('/api/admin/cameras/reorder', { method: 'POST', json: { ids: [a.body.id] } })).status, 401)
   assert.equal((await api('/api/admin/cameras/reorder', { method: 'POST', admin: true, json: { ids: [] } })).status, 400)
 })
+
+test('kerangka publik: semua halaman publik memakai AppShell, jadi menu tidak hilang', () => {
+  // Penjaga regresi untuk temuan #15: dulu sidebar hanya ada di Beranda sehingga
+  // pengunjung "kehilangan" menu begitu masuk ke Cluster/Peta/Status. Halaman publik
+  // baru wajib memakai AppShell; Embed (mini-app) dan Admin (panel) memang punya
+  // kerangka sendiri.
+  const dir = new URL('../../web/src/pages/', import.meta.url)
+  const pages = fs.readdirSync(dir).filter((f) => f.endsWith('.tsx'))
+  assert.ok(pages.length >= 6, 'halaman publik seharusnya terdeteksi')
+  const khas = new Set(['Embed.tsx', 'Admin.tsx'])
+  for (const f of pages) {
+    if (khas.has(f)) continue
+    const src = fs.readFileSync(new URL(f, dir), 'utf8')
+    assert.match(src, /components\/AppShell/, `${f} seharusnya memakai AppShell agar menu tetap ada`)
+    assert.doesNotMatch(src, /zk-app--plain/, `${f} masih memakai kerangka lama zk-app--plain`)
+  }
+})

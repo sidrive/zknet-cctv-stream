@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import AppShell from '../components/AppShell'
 import { api, ApiError, type HealthDetail } from '../api'
 import { formatChecked } from '../status'
 
@@ -22,20 +23,15 @@ export default function Status() {
     } catch (e) { setError(errMsg(e)) } finally { setRefreshing(false) }
   }
 
-  if (error) return <div className="zk-app zk-app--plain"><main className="zk-main"><div className="container page"><p className="error">{error}</p><Link to="/">← Kembali</Link></div></main></div>
-  if (!h) return <div className="zk-app zk-app--plain"><main className="zk-main"><div className="container page"><p className="muted">Memuat…</p></div></main></div>
+  if (error) return <AppShell title="Status Jaringan"><p className="error">{error}</p></AppShell>
+  if (!h) return <AppShell title="Status Jaringan"><p className="muted">Memuat…</p></AppShell>
 
   const c = h.cameras
   const pct = (n: number, d: number) => (d ? Math.round((n / d) * 100) : 0)
 
   return (
-    <div className="zk-app zk-app--plain">
-      <main className="zk-main">
+    <AppShell title="Status Jaringan" subtitle="Kesehatan layanan dan kamera yang bermasalah.">
         <div className="zk-page">
-          <nav className="zk-crumbs"><Link to="/" className="zk-link">← Beranda</Link></nav>
-          <div className="zk-panel__head" style={{ marginBottom: '1.25rem' }}>
-            <h1 className="zk-h2"><svg className="zk-icon"><use href="#i-signal" /></svg> Status Jaringan</h1>
-          </div>
 
           <div className="zk-grid-stats" style={{ marginBottom: '1.25rem' }}>
             <div className={`zk-stat ${h.ok ? 'zk-stat--success' : 'zk-stat--danger'}`}><div className="zk-stat__icon"><svg className="zk-icon"><use href="#i-signal" /></svg></div><div><div className="zk-stat__label">Layanan ZKNet</div><div className="zk-stat__value">{h.ok ? 'Normal' : 'Ada Gangguan'}</div></div></div>
@@ -86,7 +82,6 @@ export default function Status() {
             <p className="zk-text-sm" style={{ color: 'var(--zk-muted)' }}>Status dihitung server dengan mengetes sumber tiap kamera (berjalan otomatis tiap 60 detik). Butuh waktu beberapa saat setelah server menyala untuk kamera pertama kali dicek.</p>
           </div>
         </div>
-      </main>
-    </div>
+    </AppShell>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import AppShell from '../components/AppShell'
 import UnlockDialog from '../components/UnlockDialog'
 import { useCatalog } from '../hooks'
 import type { Cluster } from '../api'
@@ -39,19 +40,13 @@ export default function Clusters() {
 
   const open = (c: Cluster) => (c.locked && !c.unlocked ? setUnlock(c) : nav(`/c/${c.slug}`))
 
-  if (error) return <div className="zk-app zk-app--plain"><main className="zk-main"><div className="zk-page"><p className="error">{error}</p><Link className="zk-link" to="/">← Beranda</Link></div></main></div>
-  if (!data) return <div className="zk-app zk-app--plain"><main className="zk-main"><div className="zk-page"><p className="muted">Memuat…</p></div></main></div>
+  if (error) return <AppShell title="Cluster CCTV"><p className="error">{error}</p></AppShell>
+  if (!data) return <AppShell title="Cluster CCTV"><p className="muted">Memuat…</p></AppShell>
 
   return (
-    <div className="zk-app zk-app--plain">
-      <main className="zk-main">
+    <>
+    <AppShell title="Cluster CCTV" subtitle={`${total} cluster · ${lockedCount} butuh kode`}>
         <div className="zk-page">
-          <nav className="zk-crumbs"><Link to="/" className="zk-link">← Beranda</Link></nav>
-
-          <div className="zk-panel__head" style={{ marginBottom: '1.25rem' }}>
-            <h1 className="zk-h2"><svg className="zk-icon"><use href="#i-users" /></svg> Semua Cluster</h1>
-            <span className="zk-text-sm">{total} cluster · {lockedCount} butuh kode</span>
-          </div>
 
           <div className="zk-cluster-tools">
             <label className="zk-search" style={{ minWidth: 0 }}>
@@ -89,7 +84,7 @@ export default function Clusters() {
             )}
           </div>
         </div>
-      </main>
+    </AppShell>
 
       {unlock && (
         <UnlockDialog
@@ -100,7 +95,7 @@ export default function Clusters() {
           onUnlocked={() => { const slug = unlock.slug; setUnlock(null); reload(); nav(`/c/${slug}`) }}
         />
       )}
-    </div>
+    </>
   )
 }
 

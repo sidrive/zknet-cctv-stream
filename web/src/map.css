@@ -7,9 +7,14 @@
   grid-template-rows: auto 1fr;
   gap: 0;
   padding: 0;
-  height: 100vh;
+  /* Halaman peta kini berada di dalam AppShell (topbar + padding), jadi tingginya
+     dikurangi tinggi topbar & padding kerangka agar peta pas satu layar. */
+  height: calc(100vh - 128px);
+  min-height: 420px;
   max-width: none;
   background: #05080f;
+  border-radius: var(--zk-r-md, 12px);
+  overflow: hidden;
 }
 
 /* ---------- Bar atas ---------- */

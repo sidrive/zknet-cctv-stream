@@ -6,7 +6,7 @@ Setiap item menyebut lokasi kode supaya bisa langsung dikerjakan.
 Audit dilakukan pada commit `57fbe38` dengan server dijalankan lokal (`data/cctv.db`: 2 cluster, 150 kamera, 149 HLS + 1 RTSP).
 
 **Progres:** #1 peta, #2 halaman status, #3 statistik online, #10 badge status, #11 health detail selesai
-(Sprint 1 + peta). #4, #5, #6, #7, #14 selesai (Sprint 2). #12, #8, #9, dan #13 selesai. Sisa: #15.
+(Sprint 1 + peta). #4, #5, #6, #7, #14 selesai (Sprint 2). #12, #8, #9, #13, dan #15 selesai — seluruh daftar audit tuntas.
 
 ## Ringkasan
 
@@ -26,7 +26,7 @@ Audit dilakukan pada commit `57fbe38` dengan server dijalankan lokal (`data/cctv
 | 12 | ~~**Manajemen kode akses**~~ | **selesai** — `access_version` + kode terenkripsi: kode bisa dilihat lagi, cabut akses seketika (dengan/tanpa ganti kode) | ✅ |
 | 13 | ~~**Urutan (sort) di UI admin**~~ | **selesai** — input "Urutan" di form kamera & cluster, tombol ↑/↓ di daftar kamera (endpoint `POST /api/admin/cameras/reorder` menulis seluruh urutan dalam satu transaksi) | ✅ |
 | 14 | ~~**Halaman 404 SPA**~~ | **selesai** — URL tak dikenal balas 404 (aset & rute SPA tetap 200) + halaman 404 dengan tombol kembali | ✅ |
-| 15 | **Navigasi publik tidak konsisten** | sidebar hanya di Beranda, halaman lain pakai gaya lama | P2 |
+| 15 | ~~**Navigasi publik tidak konsisten**~~ | **selesai** — komponen `AppShell` dipakai semua halaman publik (sidebar + topbar, item aktif otomatis, drawer di ponsel); anchor `/#cctv-publik` menggulir ke bagian yang dituju walau data belum termuat | ✅ |
 
 ---
 
