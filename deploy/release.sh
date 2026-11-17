@@ -23,4 +23,4 @@ else
   git commit -m "build: dist untuk deploy STB"
 fi
 git push origin "$BRANCH"
-echo "==> Selesai. Di STB jalankan: /opt/zknet-cctv-stream/deploy/stb-update.sh"
+echo "==> Selesai. Di STB jalankan: <lokasi-repo>/deploy/stb-update.sh (skrip mendeteksi lokasinya sendiri)"

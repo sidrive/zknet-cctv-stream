@@ -9,7 +9,7 @@
 # Aman diulang: koordinat yang sudah terisi TIDAK diubah kecuali pakai --force,
 # jadi koreksi manual lewat panel admin tetap utuh.
 set -euo pipefail
-REPO_DIR="${REPO_DIR:-/opt/zknet-cctv-stream}"
+REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$REPO_DIR"
 
 [ -f .env ] || { echo ".env belum ada: cp .env.example .env lalu isi (DATA_DIR, ...)" >&2; exit 1; }

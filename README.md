@@ -86,8 +86,8 @@ npm run release     # = deploy/release.sh: npm ci -> test -> build -> commit ser
 ### 2. Setup pertama di STB
 ```bash
 sudo apt install -y ffmpeg            # Node >= 20.6 dan pm2 juga dibutuhkan (npm i -g pm2)
-git clone -b main https://github.com/sidrive/zknet-cctv-stream.git /opt/zknet-cctv-stream
-cd /opt/zknet-cctv-stream
+git clone -b main https://github.com/sidrive/zknet-cctv-stream.git ~/zknet-cctv-stream   # lokasi bebas
+cd ~/zknet-cctv-stream
 
 ss -tulpn | grep LISTEN               # pilih port yang benar-benar kosong
 cp .env.example .env && nano .env
@@ -103,6 +103,10 @@ SETUP_TOKEN=<acak panjang>
 FFMPEG_IDLE_SECONDS=30
 ```
 
+> Lokasi repo di STB bebas (mis. `/opt/zknet-cctv-stream` atau `/home/sidrive/zknet-cctv-stream`).
+> Skrip di `deploy/` mendeteksi folder induknya sendiri, jadi tidak perlu mengubah path
+> apa pun — cukup jalankan dari lokasi mana pun repo berada.
+
 ### 3. Pindahkan database yang sudah ada (semua kamera, cluster, admin, pengaturan)
 Di mesin tempat database diisi (`./data/cctv.db` atau `$DATA_DIR`):
 ```bash
@@ -111,7 +115,7 @@ scp cctv-export.db <user>@<ip-stb>:/tmp/
 ```
 Di STB:
 ```bash
-/opt/zknet-cctv-stream/deploy/stb-restore-db.sh /tmp/cctv-export.db
+./deploy/stb-restore-db.sh /tmp/cctv-export.db   # dijalankan dari root repo
 ```
 Skrip memvalidasi file (integrity check + jumlah admin/cluster/kamera), menghentikan app, membuat backup `cctv.db.bak-<waktu>` bila sudah ada DB, membersihkan sisa WAL, memasang file (`chmod 600`), lalu menyalakan app. Login admin lama tetap berlaku (secret sesi ikut tersalin). `SETUP_TOKEN` tidak dipakai lagi karena admin sudah ada.
 
@@ -119,7 +123,7 @@ Skrip memvalidasi file (integrity check + jumlah admin/cluster/kamera), menghent
 
 ### 4. Jalankan
 ```bash
-/opt/zknet-cctv-stream/deploy/stb-update.sh   # npm ci (hanya dependency server) + pm2 start + pm2 save + cek /api/health
+./deploy/stb-update.sh   # npm ci (hanya dependency server) + pm2 start + pm2 save + cek /api/health (dari root repo)
 pm2 startup                                   # sekali saja, agar hidup lagi setelah reboot (ikuti perintah yang ditampilkan)
 ```
 
@@ -137,7 +141,7 @@ curl https://cctv.domainanda.com/api/health
 Setelah itu, di panel admin → *Embed & Pengaturan*, isi "Origin yang boleh meng-embed" bila dipakai sebagai mini-app.
 
 ### Update berikutnya
-Laptop: `npm run release`. STB: `/opt/zknet-cctv-stream/deploy/stb-update.sh`.
+Laptop: `npm run release`. STB: dari root repo, jalankan `./deploy/stb-update.sh`.
 
 ### Mengisi koordinat kamera (sekali, setelah update yang menambahkan /peta)
 Migrasi aplikasi hanya **menambah kolom** `lat`/`lng` yang masih kosong, jadi `/peta` akan
@@ -145,7 +149,7 @@ menampilkan "0 kamera berkoordinat" sampai kolom itu diisi. Isinya tidak perlu i
 `scripts/camera-coords.json` ikut repo.
 
 ```bash
-/opt/zknet-cctv-stream/deploy/stb-apply-coords.sh
+./deploy/stb-apply-coords.sh   # jalankan dari root repo
 ```
 
 Skrip itu: membaca `DATA_DIR` dari `.env`, **membuat backup** `cctv.db.pre-coords-<waktu>.bak`,

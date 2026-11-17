@@ -3,7 +3,7 @@
 #   deploy/stb-restore-db.sh /path/ke/cctv.db
 set -euo pipefail
 SRC="${1:?pakai: $0 /path/ke/cctv.db}"
-REPO_DIR="${REPO_DIR:-/opt/zknet-cctv-stream}"
+REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$REPO_DIR"
 DATA_DIR="$(grep -E '^DATA_DIR=' .env | cut -d= -f2)"; DATA_DIR="${DATA_DIR:-$REPO_DIR/data}"
 

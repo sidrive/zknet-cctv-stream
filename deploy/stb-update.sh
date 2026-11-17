@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Dijalankan di STB. Aman dipakai untuk setup pertama MAUPUN update berikutnya.
-#   REPO_DIR (default /opt/zknet-cctv-stream), BRANCH (default: branch yang sedang aktif)
+#   REPO_DIR (default: folder induk dari skrip ini, jadi bebas di mana repo diletakkan)
+#   BRANCH (default: branch yang sedang aktif)
 set -euo pipefail
-REPO_DIR="${REPO_DIR:-/opt/zknet-cctv-stream}"
+REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$REPO_DIR"
 
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
