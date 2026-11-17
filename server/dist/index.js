@@ -55,7 +55,13 @@ app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint tidak dit
 // Frontend (SPA) hasil build.
 if (fs.existsSync(config.webDir)) {
     app.use(express.static(config.webDir, { index: false, maxAge: '1h' }));
-    app.get('*', (_req, res) => res.sendFile(path.join(config.webDir, 'index.html')));
+    // Semua rute SPA yang dikenal tetap 200; selain itu 404 supaya URL salah tidak
+    // tampil sebagai "sehat" di log/monitoring. Halaman 404-nya tetap dari SPA.
+    const spaRoutes = [/^\/$/, /^\/c\/[^/]+\/?$/, /^\/v\/[^/]+\/?$/, /^\/status\/?$/, /^\/peta\/?$/, /^\/cluster\/?$/, /^\/embed\/?$/, /^\/admin(\/.*)?$/];
+    app.get('*', (req, res) => {
+        const known = spaRoutes.some((re) => re.test(req.path));
+        res.status(known ? 200 : 404).sendFile(path.join(config.webDir, 'index.html'));
+    });
 }
 else {
     app.get('/', (_req, res) => res.type('text').send('Frontend belum di-build. Jalankan: npm run build'));
