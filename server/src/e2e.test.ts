@@ -281,3 +281,45 @@ test('koordinat: nilai di luar rentang ditolak', async () => {
   })
   assert.equal(bad.status, 400)
 })
+
+test('filter cluster di peta: katalog memberi clusterId + koordinat untuk pengelompokan', async () => {
+  const mkCluster = (name: string, slug: string) =>
+    api('/api/admin/clusters', { method: 'POST', admin: true, json: { name, slug } })
+  const a = await mkCluster('Peta A', 'peta-a')
+  const b = await mkCluster('Peta B', 'peta-b')
+  assert.equal(a.status, 201)
+  assert.equal(b.status, 201)
+
+  const mkCam = (name: string, clusterId: string, lat: number, lng: number) =>
+    api('/api/admin/cameras', {
+      method: 'POST', admin: true,
+      json: { name, sourceType: 'hls', sourceUrl: 'http://127.0.0.1:18081/index.m3u8', clusterId, lat, lng },
+    })
+  assert.equal((await mkCam('A1', a.body.id, -7.9, 110.3)).status, 201)
+  assert.equal((await mkCam('A2', b.body.id, -7.7, 110.4)).status, 201)
+  assert.equal((await mkCam('B1', b.body.id, -7.8, 110.1)).status, 201)
+
+  const cat = await api('/api/catalog')
+  const plotable = cat.body.cameras.filter((c: any) => typeof c.lat === 'number')
+  // Setiap kamera berkoordinat WAJIB punya field clusterId (boleh null untuk kamera
+  // tanpa cluster). Tanpa field ini filter cluster di /peta tidak bisa mengelompokkan
+  // kamera, sehingga zoom-per-cluster tidak jalan.
+  for (const c of plotable) assert.ok('clusterId' in c, `kamera ${c.name} tanpa field clusterId`)
+  // clusterId yang terisi harus menunjuk cluster yang benar-benar ada di daftar clusters
+  const clusterIds = new Set(cat.body.clusters.map((c: any) => c.id))
+  for (const c of plotable) {
+    if (c.clusterId != null) assert.ok(clusterIds.has(c.clusterId), `clusterId ${c.clusterId} tidak ada di clusters`)
+  }
+  // Kamera tanpa cluster tetap boleh tampil di peta (mode "Semua"), tapi tidak masuk
+  // hitungan cluster mana pun.
+  assert.ok(plotable.some((c: any) => c.clusterId === null))
+
+  // Dua cluster berbeda -> masing-masing punya koordinat sendiri; inilah yang dipakai
+  // peta untuk fitBounds per cluster.
+  const inA = plotable.filter((c: any) => c.clusterId === a.body.id)
+  const inB = plotable.filter((c: any) => c.clusterId === b.body.id)
+  assert.deepEqual(inA.map((c: any) => c.name), ['A1'])
+  assert.deepEqual(inB.map((c: any) => c.name).sort(), ['A2', 'B1'])
+  const spanB = Math.abs(inB[0].lat - inB[1].lat)
+  assert.ok(spanB > 0, 'sebaran koordinat cluster B harus punya luas')
+})

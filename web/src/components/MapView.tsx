@@ -27,9 +27,15 @@ export interface MapViewProps {
   cameras: Camera[]
   selectedId: string | null
   onSelect: (camera: Camera) => void
+  /**
+   * Minta peta menyesuaikan area tampilan. `key` berubah => peta zoom ke
+   * sebaran `points`. Dipakai filter cluster: pilih "CCTV Bantul" maka peta
+   * pindah & zoom ke area Bantul, pilih "Semua" kembali ke seluruh DIY.
+   */
+  focus?: { key: string; points: Camera[] }
 }
 
-export default function MapView({ cameras, selectedId, onSelect }: MapViewProps) {
+export default function MapView({ cameras, selectedId, onSelect, focus }: MapViewProps) {
   const boxRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MlMap | null>(null)
   const markersRef = useRef<Marker[]>([])
@@ -137,6 +143,37 @@ export default function MapView({ cameras, selectedId, onSelect }: MapViewProps)
     if (!cam || typeof cam.lat !== 'number' || typeof cam.lng !== 'number') return
     map.flyTo({ center: [cam.lng, cam.lat], zoom: 15.5, duration: 900 })
   }, [selectedId, cameras])
+
+  // 5) Sesuaikan tampilan ke sebaran koordinat saat filter cluster berubah.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready || !focus) return
+    const pts = focus.points.filter((c) => typeof c.lat === 'number' && typeof c.lng === 'number')
+    if (pts.length === 0) return
+
+    if (pts.length === 1) {
+      // Satu kamera: fitBounds akan gagal (luas nol), jadi terbang langsung.
+      map.flyTo({ center: [pts[0].lng as number, pts[0].lat as number], zoom: 15, duration: 900 })
+      return
+    }
+    let w = Infinity, s = Infinity, e = -Infinity, n = -Infinity
+    for (const p of pts) {
+      const lng = p.lng as number
+      const lat = p.lat as number
+      if (lng < w) w = lng
+      if (lng > e) e = lng
+      if (lat < s) s = lat
+      if (lat > n) n = lat
+    }
+    map.fitBounds([[w, s], [e, n]], {
+      padding: { top: 70, right: 70, bottom: 70, left: 70 },
+      maxZoom: 14, // cluster kecil jangan sampai terlalu dekat
+      duration: 1000,
+    })
+    // Sengaja hanya bergantung pada focus.key: perubahan daftar kamera (mis. status
+    // online/offline) tidak boleh membuat peta melompat sendiri.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.key, ready])
 
   return (
     <div className={`os-map${selectedId ? " has-detail" : ""}`}>

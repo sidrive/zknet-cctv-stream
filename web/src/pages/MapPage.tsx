@@ -11,8 +11,21 @@ export default function MapPage() {
   const nav = useNavigate()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [q, setQ] = useState('')
+  // '' = semua cluster. Bila diisi id cluster, peta hanya menampilkan cluster itu
+  // dan otomatis zoom ke area cakupannya.
+  const [cluster, setCluster] = useState('')
 
-  const withCoords = useMemo(() => (data?.cameras ?? []).filter((c) => typeof c.lat === 'number' && typeof c.lng === 'number'), [data])
+  const allCoords = useMemo(() => (data?.cameras ?? []).filter((c) => typeof c.lat === 'number' && typeof c.lng === 'number'), [data])
+  const withCoords = useMemo(() => (cluster ? allCoords.filter((c) => c.clusterId === cluster) : allCoords), [allCoords, cluster])
+  // Hanya cluster yang punya kamera berkoordinat: cluster terkunci tidak dikirim
+  // koordinatnya oleh server, jadi tidak ada gunanya tampil di filter.
+  const chips = useMemo(
+    () => (data?.clusters ?? [])
+      .map((cl) => ({ ...cl, count: allCoords.filter((c) => c.clusterId === cl.id).length }))
+      .filter((cl) => cl.count > 0),
+    [data, allCoords],
+  )
+  const activeChip = chips.find((cl) => cl.id === cluster) ?? null
   const selected = withCoords.find((c) => c.id === selectedId) ?? null
   const term = q.trim().toLowerCase()
   const results = useMemo(
@@ -25,6 +38,9 @@ export default function MapPage() {
   if (!data) return <div className="zk-app zk-app--plain"><main className="zk-main"><p className="muted">Memuat…</p></main></div>
 
   const pick = (c: Camera) => { setSelectedId(c.id); setQ('') }
+  // Saat cluster berganti, pilihan kamera direset agar panel detail tidak
+  // menampilkan kamera yang markernya sudah tidak ada di peta.
+  const changeCluster = (id: string) => { setCluster(id); setSelectedId(null); setQ('') }
 
   return (
     <div className="zk-app zk-app--plain">
@@ -33,7 +49,25 @@ export default function MapPage() {
           <Link to="/" className="os-back" aria-label="Kembali">←</Link>
           <div className="os-title">
             <strong>PETA LOKASI</strong>
-            <span>{withCoords.length} kamera berkoordinat{offline ? ` · ${offline} offline` : ''}</span>
+            <span>
+              {activeChip ? `${activeChip.name} · ` : ''}
+              {withCoords.length} kamera berkoordinat{offline ? ` · ${offline} offline` : ''}
+            </span>
+          </div>
+          <div className="os-chips" role="group" aria-label="Filter cluster">
+            <button className={cluster === '' ? 'is-on' : ''} onClick={() => changeCluster('')} aria-pressed={cluster === ''}>
+              Semua<em>{allCoords.length}</em>
+            </button>
+            {chips.map((cl) => (
+              <button
+                key={cl.id}
+                className={cluster === cl.id ? 'is-on' : ''}
+                onClick={() => changeCluster(cl.id)}
+                aria-pressed={cluster === cl.id}
+              >
+                {cl.name.replace(/^CCTV\s+/i, '')}<em>{cl.count}</em>
+              </button>
+            ))}
           </div>
           <label className="os-search">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="1.7" /><path d="m16 16 5 5" stroke="currentColor" strokeWidth="1.7" /></svg>
@@ -54,7 +88,12 @@ export default function MapPage() {
         </div>
 
         <div className="os-stage">
-          <MapView cameras={withCoords} selectedId={selectedId} onSelect={pick} />
+          <MapView
+            cameras={withCoords}
+            selectedId={selectedId}
+            onSelect={pick}
+            focus={{ key: cluster || 'all', points: withCoords }}
+          />
 
           {selected && (
             <aside className="os-detail">
