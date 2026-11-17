@@ -226,6 +226,24 @@ body.zk { margin: 0; background: var(--zk-grad-page); color: var(--zk-text);
 .zk-notif__foot { font-size: var(--zk-fs-xs); color: var(--zk-primary-hi); text-decoration: none; }
 .zk-notif__foot:hover { text-decoration: underline; }
 
+/* ---------- Panel kode akses (form admin) ------------------------------- */
+.code-panel {
+  display: grid; gap: var(--zk-s-2);
+  padding: var(--zk-s-3);
+  border: 1px solid var(--zk-border); border-radius: var(--zk-r-md);
+  background: var(--zk-surface-2);
+}
+.code-panel__title { font-size: var(--zk-fs-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--zk-text-muted); }
+.code-panel__row { display: flex; align-items: center; gap: var(--zk-s-3); flex-wrap: wrap; }
+.code-panel__value {
+  flex: 1 1 auto; min-width: 0; overflow-x: auto; white-space: nowrap;
+  padding: 6px 10px; border-radius: var(--zk-r-sm, 6px);
+  background: #06122b; border: 1px dashed var(--zk-border-strong);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--zk-fs-sm);
+  color: var(--zk-text);
+}
+.code-panel__actions { display: flex; gap: var(--zk-s-2); flex-wrap: wrap; }
+
 /* ---------- Halaman daftar cluster -------------------------------------- */
 .zk-cluster-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--zk-s-3); margin-bottom: var(--zk-s-4); }
 .zk-cluster-tools .zk-search { flex: 1 1 220px; }

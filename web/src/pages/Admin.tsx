@@ -140,7 +140,7 @@ function Cameras({ cameras, clusters, reload }: { cameras: AdminCamera[]; cluste
           </tbody>
         </table>
       </div>
-      {editing && <CameraForm cam={editing === 'new' ? null : editing} clusters={clusters} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload() }} />}
+      {editing && <CameraForm cam={editing === 'new' ? null : editing} clusters={clusters} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload() }} onChanged={reload} />}
       {preview && (
         <div className="modal-backdrop" onClick={() => setPreview(null)}>
           <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
@@ -153,7 +153,7 @@ function Cameras({ cameras, clusters, reload }: { cameras: AdminCamera[]; cluste
   )
 }
 
-function CameraForm({ cam, clusters, onClose, onSaved }: { cam: AdminCamera | null; clusters: AdminCluster[]; onClose: () => void; onSaved: () => void }) {
+function CameraForm({ cam, clusters, onClose, onSaved, onChanged }: { cam: AdminCamera | null; clusters: AdminCluster[]; onClose: () => void; onSaved: () => void; onChanged: () => void }) {
   const [f, setF] = useState(() => cam ? { ...EMPTY_CAM, ...cam, clusterId: cam.clusterId ?? '', accessCode: '', lat: cam.lat != null ? String(cam.lat) : '', lng: cam.lng != null ? String(cam.lng) : '' } : { ...EMPTY_CAM })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -217,6 +217,9 @@ function CameraForm({ cam, clusters, onClose, onSaved }: { cam: AdminCamera | nu
           {f.accessMode === 'protected' && (
             <label className="field"><span>Kode akses {cam?.hasCode && '(kosongkan = tetap)'}</span>
               <input type="text" value={f.accessCode} onChange={(e) => set('accessCode', e.target.value)} autoComplete="off" required={!cam?.hasCode || cam.accessMode !== 'protected'} /></label>
+          )}
+          {cam && (
+            <AccessCodePanel kind="camera" id={cam.id} protectedMode={f.accessMode === 'protected'} codeViewable={cam.codeViewable} onChanged={onChanged} />
           )}
           <label className="check"><input type="checkbox" checked={f.enabled} onChange={(e) => set('enabled', e.target.checked)} /> Aktif</label>
           <label className="check"><input type="checkbox" checked={f.listed} onChange={(e) => set('listed', e.target.checked)} /> Tampil di daftar (matikan = hanya via link langsung)</label>
@@ -300,6 +303,77 @@ function CoordPicker({ lat, lng, onPick, onClose }: { lat: number | null; lng: n
   )
 }
 
+
+/**
+ * Panel kode akses di form cluster/kamera.
+ *
+ * Kode disimpan terenkripsi (bukan hanya hash), jadi admin bisa melihat lagi
+ * untuk dibagikan. "Cabut akses" mematikan semua grant yang sudah beredar
+ * (termasuk link `?grant=` dan embed) tanpa menunggu masa berlaku habis.
+ */
+function AccessCodePanel({ kind, id, protectedMode, codeViewable, onChanged }: {
+  kind: 'cluster' | 'camera'
+  id: string
+  protectedMode: boolean
+  codeViewable: boolean
+  onChanged: () => void
+}) {
+  const [code, setCode] = useState<string | null>(null)
+  const [note, setNote] = useState('')
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const r = kind === 'cluster' ? await admin.clusterCode(id) : await admin.cameraCode(id)
+      setCode(r.code); setNote('')
+    } catch (err) { setCode(null); setNote(errMsg(err)) }
+  }, [kind, id])
+
+  useEffect(() => { if (protectedMode && codeViewable) load() }, [protectedMode, codeViewable, load])
+
+  if (!protectedMode) return null
+
+  const revoke = async (rotate: boolean) => {
+    const pesan = rotate
+      ? `Cabut akses dan ganti kode?\n\nSemua yang sudah membuka kunci (termasuk embed) harus memakai kode baru.`
+      : `Cabut akses tanpa mengganti kode?\n\nSemua tautan/grant yang sudah dibagikan langsung berhenti, TETAPI siapa pun yang tahu kode lama masih bisa membuka lagi.`
+    if (!confirm(pesan)) return
+    setBusy(true); setMsg('')
+    try {
+      const r = rotate
+        ? (kind === 'cluster' ? await admin.revokeCluster(id, { rotate: true }) : await admin.revokeCamera(id, { rotate: true }))
+        : (kind === 'cluster' ? await admin.revokeCluster(id, {}) : await admin.revokeCamera(id, {}))
+      if (r.code) setCode(r.code)
+      setMsg(rotate ? `Kode baru dibuat (versi akses ${r.accessVersion}). Salin dan bagikan.` : `Akses dicabut (versi akses ${r.accessVersion}). Tautan lama tidak berlaku lagi.`)
+      if (!r.code) load()
+      onChanged()
+    } catch (err) { setMsg(errMsg(err)) } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="code-panel">
+      <span className="code-panel__title">Kode akses saat ini</span>
+      {code ? (
+        <div className="code-panel__row">
+          <code className="code-panel__value">{code}</code>
+          <button type="button" className="btn btn-sm" onClick={() => { navigator.clipboard?.writeText(code); setMsg('Kode disalin.') }}>Salin</button>
+        </div>
+      ) : (
+        <p className="muted small" style={{ margin: 0 }}>{note || 'Memuat kode…'}</p>
+      )}
+      <div className="code-panel__actions">
+        <button type="button" className="btn btn-sm" disabled={busy} onClick={() => revoke(true)}>Cabut + ganti kode</button>
+        <button type="button" className="btn btn-sm btn-danger" disabled={busy} onClick={() => revoke(false)}>Cabut akses saja</button>
+      </div>
+      <p className="muted small" style={{ margin: 0 }}>
+        "Cabut akses" mematikan tautan/grant yang sudah beredar seketika. "Cabut + ganti kode" juga membuat kode lama tidak berlaku.
+      </p>
+      {msg && <p className="small" role="status" style={{ margin: 0 }}>{msg}</p>}
+    </div>
+  )
+}
+
 // ---------------- Cluster ----------------
 function Clusters({ clusters, reload }: { clusters: AdminCluster[]; reload: () => void }) {
   const [editing, setEditing] = useState<AdminCluster | 'new' | null>(null)
@@ -323,12 +397,12 @@ function Clusters({ clusters, reload }: { clusters: AdminCluster[]; reload: () =
           ))}
           {clusters.length === 0 && <tr><td colSpan={5} className="muted">Belum ada cluster.</td></tr>}
         </tbody></table></div>
-      {editing && <ClusterForm cluster={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload() }} />}
+      {editing && <ClusterForm cluster={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload() }} onChanged={reload} />}
     </section>
   )
 }
 
-function ClusterForm({ cluster, onClose, onSaved }: { cluster: AdminCluster | null; onClose: () => void; onSaved: () => void }) {
+function ClusterForm({ cluster, onClose, onSaved, onChanged }: { cluster: AdminCluster | null; onClose: () => void; onSaved: () => void; onChanged: () => void }) {
   const [f, setF] = useState({ name: cluster?.name ?? '', slug: cluster?.slug ?? '', description: cluster?.description ?? '', sort: cluster?.sort ?? 0, accessMode: cluster?.accessMode ?? 'public', accessCode: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -356,6 +430,9 @@ function ClusterForm({ cluster, onClose, onSaved }: { cluster: AdminCluster | nu
             <input value={f.accessCode} onChange={(e) => setF({ ...f, accessCode: e.target.value })} autoComplete="off" required={!cluster?.hasCode || cluster.accessMode !== 'protected'} /></label>
         )}
         <p className="muted small">Kode cluster membuka daftar kameranya. Kamera yang punya kode sendiri tetap meminta kodenya.</p>
+        {cluster && (
+          <AccessCodePanel kind="cluster" id={cluster.id} protectedMode={f.accessMode === 'protected'} codeViewable={cluster.codeViewable} onChanged={onChanged} />
+        )}
         {error && <p className="error" role="alert">{error}</p>}
         <div className="row end"><button type="button" className="btn btn-ghost" onClick={onClose}>Batal</button><button className="btn btn-primary" disabled={busy}>Simpan</button></div>
       </form>

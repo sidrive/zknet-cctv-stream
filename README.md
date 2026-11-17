@@ -143,6 +143,30 @@ Setelah itu, di panel admin → *Embed & Pengaturan*, isi "Origin yang boleh men
 ### Update berikutnya
 Laptop: `npm run release`. STB: dari root repo, jalankan `./deploy/stb-update.sh`.
 
+### Kode akses: berbagi, melihat lagi, dan mencabut
+Kode akses cluster/kamera disimpan **terenkripsi** (AES-256-GCM), sehingga admin bisa
+membukanya lagi untuk dibagikan. Verifikasi tetap memakai hash bcrypt, jadi file database
+yang bocor sendirian tidak langsung membuka semua kode.
+
+Di panel admin, form cluster/kamera yang berstatus *Perlu kode* menampilkan:
+
+* **kode saat ini** + tombol **Salin** — untuk dibagikan ulang;
+* **Cabut + ganti kode** — kode baru dibuat server (bisa juga Anda ketik sendiri), lalu
+  ditampilkan sekali untuk disalin;
+* **Cabut akses saja** — mematikan semua tautan/grant yang sudah beredar tanpa mengganti kode.
+
+**Apa yang dicabut?** Setiap kali kode dipakai, server menerbitkan token (grant) berisi daftar
+ID yang dibuka dan versi aksesnya. Mencabut akses menaikkan `access_version`, sehingga token
+lama langsung ditolak — tidak perlu menunggu masa berlaku habis (bawaan 12 jam, lihat
+`grant_ttl_hours`). Yang ikut terputus: tautan `?grant=…`, embed yang memakai API key, dan
+tab browser yang sedang menonton.
+
+> **Penting:** "Cabut akses saja" tidak mengubah kode, jadi orang yang tahu kode lama masih bisa
+> membuka lagi. Bila kode benar-benar bocor, pakai **Cabut + ganti kode**.
+
+Kode yang dibuat **sebelum** fitur ini ada hanya tersimpan sebagai hash, sehingga tidak bisa
+ditampilkan. Panel akan memberi tahu; cukup ganti kode sekali agar bisa dilihat lagi.
+
 ### Mengisi koordinat kamera (sekali, setelah update yang menambahkan /peta)
 Migrasi aplikasi hanya **menambah kolom** `lat`/`lng` yang masih kosong, jadi `/peta` akan
 menampilkan "0 kamera berkoordinat" sampai kolom itu diisi. Isinya tidak perlu internet —

@@ -63,6 +63,14 @@ function ensureColumn(table: string, column: string, type: string) {
 // Koordinat peta. NULL = belum ditentukan; jangan digambar di (0,0).
 ensureColumn('cameras', 'lat', 'REAL')
 ensureColumn('cameras', 'lng', 'REAL')
+// Pencabutan akses: grant lama ditolak bila versinya di bawah nilai ini.
+ensureColumn('clusters', 'access_version', 'INTEGER NOT NULL DEFAULT 1')
+ensureColumn('cameras', 'access_version', 'INTEGER NOT NULL DEFAULT 1')
+// Kode akses terenkripsi (AES-256-GCM) supaya admin bisa membacanya lagi untuk dibagikan.
+// access_hash tetap dipakai untuk verifikasi, jadi database bocor tanpa kunci env tidak
+// langsung membuka semua kode.
+ensureColumn('clusters', 'access_code_enc', 'TEXT')
+ensureColumn('cameras', 'access_code_enc', 'TEXT')
 
 const DEFAULTS: Record<string, string> = {
   site_title: 'ZKNet CCTV',
@@ -81,6 +89,17 @@ export function setSetting(key: string, value: string) {
   db.prepare(
     'INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
   ).run(key, value)
+}
+
+// Kunci enkripsi kode akses. Dibuat sekali per instalasi (seperti jwt_secret) supaya
+// kode bisa ditampilkan lagi ke admin, tetapi tidak tersimpan sebagai teks biasa.
+export function codeEncKey(): Buffer {
+  let raw = getSetting('code_enc_key')
+  if (!raw) {
+    raw = crypto.randomBytes(32).toString('base64')
+    setSetting('code_enc_key', raw)
+  }
+  return Buffer.from(raw, 'base64')
 }
 
 export const PUBLIC_SETTING_KEYS = ['site_title', 'site_description'] as const

@@ -63,13 +63,21 @@ export const api = {
 }
 
 // ---- Admin ----
-export interface AdminCluster { id: string; slug: string; name: string; description: string; sort: number; accessMode: 'public' | 'protected'; hasCode: boolean; cameraCount: number }
+export interface AdminCluster {
+  id: string; slug: string; name: string; description: string; sort: number
+  accessMode: 'public' | 'protected'; hasCode: boolean
+  /** true = kode bisa ditampilkan lagi (tersimpan terenkripsi). */
+  codeViewable: boolean; accessVersion: number; cameraCount: number
+}
 export interface AdminCamera {
   id: string; name: string; description: string; location: string; clusterId: string | null
   sourceType: 'hls' | 'mjpeg' | 'rtsp' | 'embed'; sourceUrl: string; proxy: boolean; transcode: boolean
   listed: boolean; enabled: boolean; sort: number; accessMode: 'public' | 'protected'; hasCode: boolean
+  codeViewable: boolean; accessVersion: number
   lat: number | null; lng: number | null
 }
+/** Hasil pencabutan akses. `code` hanya ada bila kode ikut diganti. */
+export interface RevokeResult { id: string; accessVersion: number; rotated: boolean; code?: string }
 export interface AdminSettings {
   site_title: string; site_description: string; embed_origins: string; grant_ttl_hours: string
   embed_api_key: string; active_transcoders: string
@@ -83,9 +91,13 @@ export const admin = {
   clusters: () => req<AdminCluster[]>('GET', '/api/admin/clusters'),
   saveCluster: (id: string | null, b: unknown) => req<AdminCluster>(id ? 'PUT' : 'POST', id ? `/api/admin/clusters/${id}` : '/api/admin/clusters', b),
   deleteCluster: (id: string) => req('DELETE', `/api/admin/clusters/${id}`),
+  clusterCode: (id: string) => req<{ code: string }>('GET', `/api/admin/clusters/${id}/code`),
+  revokeCluster: (id: string, b: { rotate?: boolean; accessCode?: string }) => req<RevokeResult>('POST', `/api/admin/clusters/${id}/revoke`, b),
   cameras: () => req<AdminCamera[]>('GET', '/api/admin/cameras'),
   saveCamera: (id: string | null, b: unknown) => req<AdminCamera>(id ? 'PUT' : 'POST', id ? `/api/admin/cameras/${id}` : '/api/admin/cameras', b),
   deleteCamera: (id: string) => req('DELETE', `/api/admin/cameras/${id}`),
+  cameraCode: (id: string) => req<{ code: string }>('GET', `/api/admin/cameras/${id}/code`),
+  revokeCamera: (id: string, b: { rotate?: boolean; accessCode?: string }) => req<RevokeResult>('POST', `/api/admin/cameras/${id}/revoke`, b),
   settings: () => req<AdminSettings>('GET', '/api/admin/settings'),
   saveSettings: (b: unknown) => req('PUT', '/api/admin/settings', b),
   rotateKey: () => req<{ embed_api_key: string }>('POST', '/api/admin/settings/rotate-api-key'),

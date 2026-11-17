@@ -61,7 +61,7 @@ before(async () => {
   fs.writeFileSync(path.join(webDir, 'asset.js'), 'console.log(1)')
 
   server = spawn(process.execPath, ['--import', 'tsx', 'src/index.ts'], {
-    env: { ...process.env, PORT: String(PORT), DATA_DIR: path.join(tmp, 'data'), STREAM_TMP_DIR: path.join(tmp, 'ff'), WEB_DIR: webDir },
+    env: { ...process.env, PORT: String(PORT), DATA_DIR: path.join(tmp, 'data'), STREAM_TMP_DIR: path.join(tmp, 'ff'), WEB_DIR: webDir, UNLOCK_RATE_LIMIT: '1000' },
     stdio: 'ignore',
   })
   for (let i = 0; i < 60; i++) {
@@ -352,4 +352,100 @@ test('SPA: rute dikenal 200, URL tak dikenal 404 (bukan 200 palsu)', async () =>
   const api404 = await fetch(BASE + '/api/tidak-ada')
   assert.equal(api404.status, 404)
   assert.match(api404.headers.get('content-type') ?? '', /json/)
+})
+
+test('kode akses bisa dilihat lagi oleh admin (terenkripsi, bukan teks biasa di DB)', async () => {
+  const cl = await api('/api/admin/clusters', { method: 'POST', admin: true, json: { name: 'Kode Lihat', slug: 'kode-lihat', accessMode: 'protected', accessCode: 'rahasia-777' } })
+  assert.equal(cl.status, 201)
+  assert.equal(cl.body.codeViewable, true)
+
+  const got = await api(`/api/admin/clusters/${cl.body.id}/code`, { admin: true })
+  assert.equal(got.status, 200)
+  assert.equal(got.body.code, 'rahasia-777')
+
+  // Kode yang ditampilkan memang kode yang berlaku.
+  assert.equal((await api('/api/unlock', { method: 'POST', json: { kind: 'cluster', id: 'kode-lihat', code: got.body.code } })).status, 200)
+  // Tanpa login admin tidak boleh membaca kode.
+  assert.equal((await api(`/api/admin/clusters/${cl.body.id}/code`)).status, 401)
+})
+
+test('cabut akses: grant lama langsung mati tanpa menunggu kedaluwarsa', async () => {
+  const cl = await api('/api/admin/clusters', { method: 'POST', admin: true, json: { name: 'Cabut A', slug: 'cabut-a', accessMode: 'protected', accessCode: 'kode-a' } })
+  const cam = await api('/api/admin/cameras', {
+    method: 'POST', admin: true,
+    json: { name: 'Cabut A Cam', sourceType: 'mjpeg', sourceUrl: 'http://127.0.0.1:18081/mjpeg', clusterId: cl.body.id },
+  })
+  const un = await api('/api/unlock', { method: 'POST', json: { kind: 'cluster', id: 'cabut-a', code: 'kode-a' } })
+  assert.equal(un.status, 200)
+  const ok = await api(`/api/cameras/${cam.body.id}/session`, { method: 'POST', json: {}, grant: un.body.grant })
+  assert.equal(ok.status, 200, 'grant awal harus bisa menonton')
+
+  // Cabut tanpa ganti kode: grant lama mati, tetapi kode lama masih bisa unlock lagi
+  // (itu sebabnya tombol "cabut + ganti kode" disediakan).
+  const rev = await api(`/api/admin/clusters/${cl.body.id}/revoke`, { method: 'POST', admin: true, json: {} })
+  assert.equal(rev.status, 200)
+  assert.equal(rev.body.rotated, false)
+  assert.equal(rev.body.accessVersion, 2)
+  assert.equal((await api(`/api/cameras/${cam.body.id}/session`, { method: 'POST', json: {}, grant: un.body.grant })).status, 403)
+  assert.equal((await api('/api/unlock', { method: 'POST', json: { kind: 'cluster', id: 'cabut-a', code: 'kode-a' } })).status, 200)
+})
+
+test('cabut + ganti kode: kode lama gagal, kode baru berlaku, cluster lain tidak terusik', async () => {
+  const mk = (name: string, slug: string, code: string) =>
+    api('/api/admin/clusters', { method: 'POST', admin: true, json: { name, slug, accessMode: 'protected', accessCode: code } })
+  const a = await mk('Rotasi A', 'rotasi-a', 'lama-a')
+  const b = await mk('Rotasi B', 'rotasi-b', 'kode-b')
+  const camA = await api('/api/admin/cameras', { method: 'POST', admin: true, json: { name: 'Rotasi A Cam', sourceType: 'mjpeg', sourceUrl: 'http://127.0.0.1:18081/mjpeg', clusterId: a.body.id } })
+
+  const grantB = (await api('/api/unlock', { method: 'POST', json: { kind: 'cluster', id: 'rotasi-b', code: 'kode-b' } })).body.grant
+  const oldA = await api('/api/unlock', { method: 'POST', json: { kind: 'cluster', id: 'rotasi-a', code: 'lama-a' } })
+  assert.equal(oldA.status, 200)
+
+  const rev = await api(`/api/admin/clusters/${a.body.id}/revoke`, { method: 'POST', admin: true, json: { rotate: true } })
+  assert.equal(rev.status, 200)
+  assert.equal(rev.body.rotated, true)
+  assert.ok(rev.body.code && rev.body.code.length >= 8, 'server membuat kode baru')
+  assert.notEqual(rev.body.code, 'lama-a')
+
+  // grant lama mati, kode lama ditolak, kode baru diterima
+  assert.equal((await api(`/api/cameras/${camA.body.id}/session`, { method: 'POST', json: {}, grant: oldA.body.grant })).status, 403)
+  assert.equal((await api('/api/unlock', { method: 'POST', json: { kind: 'cluster', id: 'rotasi-a', code: 'lama-a' } })).status, 403)
+  const newA = await api('/api/unlock', { method: 'POST', json: { kind: 'cluster', id: 'rotasi-a', code: rev.body.code } })
+  assert.equal(newA.status, 200)
+  assert.equal((await api(`/api/cameras/${camA.body.id}/session`, { method: 'POST', json: {}, grant: newA.body.grant })).status, 200)
+
+  // kode baru bisa dibaca staf lain lewat panel admin
+  assert.equal((await api(`/api/admin/clusters/${a.body.id}/code`, { admin: true })).body.code, rev.body.code)
+
+  // cluster B tidak ikut tercabut
+  const catB = await api('/api/catalog', { grant: grantB })
+  assert.ok(catB.body.clusters.find((c: any) => c.slug === 'rotasi-b').unlocked, 'grant cluster B harus tetap sah')
+
+  // kode sendiri bisa dipilih admin, bukan hanya acak
+  const custom = await api(`/api/admin/clusters/${a.body.id}/revoke`, { method: 'POST', admin: true, json: { rotate: true, accessCode: 'pilihan-saya' } })
+  assert.equal(custom.body.code, 'pilihan-saya')
+  assert.equal((await api('/api/unlock', { method: 'POST', json: { kind: 'cluster', id: 'rotasi-a', code: 'pilihan-saya' } })).status, 200)
+  assert.equal((await api('/api/unlock', { method: 'POST', json: { kind: 'cluster', id: 'rotasi-a', code: rev.body.code } })).status, 403)
+})
+
+test('cabut akses kamera terpisah dari cluster; sumber publik ditolak', async () => {
+  const cl = await api('/api/admin/clusters', { method: 'POST', admin: true, json: { name: 'Cam Revoke', slug: 'cam-revoke' } })
+  const cam = await api('/api/admin/cameras', {
+    method: 'POST', admin: true,
+    json: { name: 'Cam Rahasia', sourceType: 'mjpeg', sourceUrl: 'http://127.0.0.1:18081/mjpeg', clusterId: cl.body.id, accessMode: 'protected', accessCode: 'cam-kode' },
+  })
+  assert.equal(cam.body.codeViewable, true)
+  assert.equal((await api(`/api/admin/cameras/${cam.body.id}/code`, { admin: true })).body.code, 'cam-kode')
+
+  const un = await api('/api/unlock', { method: 'POST', json: { kind: 'camera', id: cam.body.id, code: 'cam-kode' } })
+  assert.equal((await api(`/api/cameras/${cam.body.id}/session`, { method: 'POST', json: {}, grant: un.body.grant })).status, 200)
+
+  const rev = await api(`/api/admin/cameras/${cam.body.id}/revoke`, { method: 'POST', admin: true, json: { rotate: true } })
+  assert.equal(rev.status, 200)
+  assert.equal((await api(`/api/cameras/${cam.body.id}/session`, { method: 'POST', json: {}, grant: un.body.grant })).status, 403)
+  assert.equal((await api('/api/unlock', { method: 'POST', json: { kind: 'camera', id: cam.body.id, code: 'cam-kode' } })).status, 403)
+
+  // kamera publik tidak punya kode untuk dicabut
+  const pub = await api('/api/admin/cameras', { method: 'POST', admin: true, json: { name: 'Cam Publik', sourceType: 'mjpeg', sourceUrl: 'http://127.0.0.1:18081/mjpeg' } })
+  assert.equal((await api(`/api/admin/cameras/${pub.body.id}/revoke`, { method: 'POST', admin: true, json: {} })).status, 400)
 })
