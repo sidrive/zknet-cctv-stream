@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent, useRef} from 'react'
 import { Link } from 'react-router-dom'
-import { admin, ApiError, type AdminCamera, type AdminCluster, type AdminSettings } from '../api'
+import { admin, ApiError, type AdminCamera, type AdminCluster, type AdminSettings, type AdminUser } from '../api'
 import Player from '../components/Player'
 
 const errMsg = (e: unknown) => (e instanceof ApiError ? e.message : 'Terjadi kesalahan')
@@ -55,7 +55,7 @@ function AuthForm({ mode, tokenRequired, onDone }: { mode: 'setup' | 'login'; to
   )
 }
 
-type Tab = 'cameras' | 'clusters' | 'settings'
+type Tab = 'cameras' | 'clusters' | 'settings' | 'admins'
 
 function Dashboard({ username, onLogout }: { username: string; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('cameras')
@@ -81,16 +81,118 @@ function Dashboard({ username, onLogout }: { username: string; onLogout: () => v
         </div>
       </div>
       <div className="tabs" role="tablist">
-        {(['cameras', 'clusters', 'settings'] as Tab[]).map((t) => (
+        {(['cameras', 'clusters', 'admins', 'settings'] as Tab[]).map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
-            {{ cameras: `Kamera (${cameras.length})`, clusters: `Cluster (${clusters.length})`, settings: 'Embed & Pengaturan' }[t]}
+            {{ cameras: `Kamera (${cameras.length})`, clusters: `Cluster (${clusters.length})`, admins: 'Admin', settings: 'Pengaturan' }[t]}
           </button>
         ))}
       </div>
       {tab === 'cameras' && <Cameras cameras={cameras} clusters={clusters} reload={load} />}
       {tab === 'clusters' && <Clusters clusters={clusters} reload={load} />}
+      {tab === 'admins' && <Admins />}
       {tab === 'settings' && <Settings />}
     </div>
+  )
+}
+
+// ---------------- Admin lain ----------------
+/** Tanggal SQLite ("2026-02-14 09:31:00", UTC) → teks lokal yang enak dibaca. */
+const fmtWhen = (v: string | null) => {
+  if (!v) return '—'
+  const d = new Date(v.replace(' ', 'T') + 'Z')
+  if (Number.isNaN(d.getTime())) return v
+  return d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function Admins() {
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [form, setForm] = useState<{ username: string; password: string } | null>(null)
+
+  const load = useCallback(() => { admin.users().then(setUsers).catch((e) => setMsg(errMsg(e))) }, [])
+  useEffect(load, [load])
+
+  const run = async (fn: () => Promise<unknown>, sukses: string) => {
+    setBusy(true); setMsg('')
+    try { await fn(); setMsg(sukses); load() } catch (e) { setMsg(errMsg(e)) } finally { setBusy(false) }
+  }
+
+  const tambah = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!form) return
+    await run(async () => { await admin.createUser(form); setForm(null) }, `Admin "${form.username}" ditambahkan.`)
+  }
+
+  return (
+    <>
+      <div className="row between wrap" style={{ alignItems: 'center', marginTop: 16 }}>
+        <p className="muted small" style={{ margin: 0, maxWidth: '58ch' }}>
+          Setiap admin punya password sendiri. Menghapus akun atau mengeluarkan sesinya langsung berlaku —
+          tidak menunggu cookie 12 jam.
+        </p>
+        <button className="btn btn-primary" onClick={() => { setMsg(''); setForm({ username: '', password: '' }) }}>+ Admin baru</button>
+      </div>
+      {msg && <p className="muted small" role="status">{msg}</p>}
+
+      <div className="table-wrap">
+        <table>
+          <thead><tr><th>Username</th><th>Dibuat</th><th>Login terakhir</th><th> </th></tr></thead>
+          <tbody>
+            {users.map((u) => (
+              <tr key={u.id}>
+                <td>
+                  <strong>{u.username}</strong>{u.isYou && <span className="zk-badge zk-badge--info" style={{ marginLeft: 8 }}>Anda</span>}
+                </td>
+                <td className="muted small">{fmtWhen(u.createdAt)}</td>
+                <td className="muted small">{u.lastLoginAt ? fmtWhen(u.lastLoginAt) : 'belum pernah'}</td>
+                <td className="actions"><div>
+                  <button className="btn btn-sm" disabled={busy || u.isYou}
+                    title={u.isYou ? 'Ganti password sendiri lewat tombol di kanan atas' : 'Ganti password admin ini'}
+                    onClick={() => {
+                      const pw = prompt(`Password baru untuk "${u.username}" (minimal 8 karakter):`)
+                      if (!pw) return
+                      run(() => admin.resetUserPassword(u.id, { password: pw }), `Password "${u.username}" diganti. Sesi lamanya ikut keluar.`)
+                    }}>Ganti password</button>
+                  <button className="btn btn-sm" disabled={busy || u.isYou}
+                    title={u.isYou ? 'Untuk akun sendiri gunakan tombol Keluar' : 'Paksa login ulang di semua perangkat'}
+                    onClick={() => {
+                      if (!confirm(`Keluarkan semua sesi "${u.username}"?\n\nOrang itu harus login lagi.`)) return
+                      run(() => admin.kickUser(u.id), `Semua sesi "${u.username}" dikeluarkan.`)
+                    }}>Keluarkan sesi</button>
+                  <button className="btn btn-sm btn-danger" disabled={busy || u.isYou}
+                    title={u.isYou ? 'Tidak bisa menghapus akun sendiri' : 'Hapus akun admin ini'}
+                    onClick={() => {
+                      if (!confirm(`Hapus admin "${u.username}"?\n\nAkun ini langsung kehilangan akses. Kamera & cluster tidak terpengaruh.`)) return
+                      run(() => admin.deleteUser(u.id), `Admin "${u.username}" dihapus.`)
+                    }}>Hapus</button>
+                </div></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {form && (
+        <div className="modal-bg" onClick={() => setForm(null)}>
+          <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={tambah}>
+            <h2>Admin baru</h2>
+            <label>Username
+              <input value={form.username} autoFocus required minLength={3} maxLength={40}
+                pattern="[A-Za-z0-9._\\-]+" onChange={(e) => setForm({ ...form, username: e.target.value })} />
+            </label>
+            <label>Password (minimal 8 karakter)
+              <input type="password" value={form.password} required minLength={8}
+                onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            </label>
+            <div className="row gap-s" style={{ justifyContent: 'flex-end' }}>
+              <button type="button" className="btn" onClick={() => setForm(null)}>Batal</button>
+              <button className="btn btn-primary" disabled={busy}>Simpan</button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
   )
 }
 

@@ -449,3 +449,119 @@ test('cabut akses kamera terpisah dari cluster; sumber publik ditolak', async ()
   const pub = await api('/api/admin/cameras', { method: 'POST', admin: true, json: { name: 'Cam Publik', sourceType: 'mjpeg', sourceUrl: 'http://127.0.0.1:18081/mjpeg' } })
   assert.equal((await api(`/api/admin/cameras/${pub.body.id}/revoke`, { method: 'POST', admin: true, json: {} })).status, 400)
 })
+
+test('admin lain: tambah, daftar, dan hanya admin yang login bisa melihat daftar', async () => {
+  const list = await api('/api/admin/users', { admin: true })
+  assert.equal(list.status, 200)
+  assert.equal(list.body.length, 1)
+  assert.equal(list.body[0].isYou, true)
+  assert.ok(list.body[0].lastLoginAt, 'login admin seharusnya tercatat')
+
+  // tanpa cookie admin, daftar akun tidak boleh terbaca
+  assert.equal((await api('/api/admin/users')).status, 401)
+
+  const bad = await api('/api/admin/users', { method: 'POST', admin: true, json: { username: 'ab', password: 'pendek' } })
+  assert.equal(bad.status, 400)
+
+  const made = await api('/api/admin/users', { method: 'POST', admin: true, json: { username: 'petugas', password: 'petugas-1234' } })
+  assert.equal(made.status, 201)
+  assert.equal((await api('/api/admin/users', { method: 'POST', admin: true, json: { username: 'petugas', password: 'petugas-1234' } })).status, 409)
+
+  const after = await api('/api/admin/users', { admin: true })
+  assert.equal(after.body.length, 2)
+  assert.equal(after.body.filter((u: any) => u.isYou).length, 1)
+  assert.equal(after.body[1].lastLoginAt, null, 'akun baru belum pernah login')
+
+  // admin kedua benar-benar bisa dipakai login
+  const login = await fetch(BASE + '/api/admin/login', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username: 'petugas', password: 'petugas-1234' }),
+  })
+  assert.equal(login.status, 200)
+  const cookie2 = (login.headers.get('set-cookie') ?? '').split(';')[0]
+  assert.equal((await api('/api/admin/clusters', { headers: { cookie: cookie2 } })).status, 200)
+
+  // yang login tercatat di daftar
+  const listed = await api('/api/admin/users', { admin: true })
+  assert.ok(listed.body.find((u: any) => u.username === 'petugas').lastLoginAt)
+})
+
+test('keluarkan sesi admin kedua: cookie lamanya langsung mati, admin utama tidak terusik', async () => {
+  const users = (await api('/api/admin/users', { admin: true })).body
+  const petugas = users.find((u: any) => u.username === 'petugas')
+  assert.ok(petugas)
+
+  const login = async () => {
+    const r = await fetch(BASE + '/api/admin/login', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'petugas', password: 'petugas-1234' }),
+    })
+    return (r.headers.get('set-cookie') ?? '').split(';')[0]
+  }
+  const cookie2 = await login()
+  assert.equal((await api('/api/admin/clusters', { headers: { cookie: cookie2 } })).status, 200)
+
+  assert.equal((await api(`/api/admin/users/${petugas.id}/kick`, { method: 'POST', admin: true, json: {} })).status, 200)
+  assert.equal((await api('/api/admin/clusters', { headers: { cookie: cookie2 } })).status, 401, 'sesi lama harus mati')
+  assert.equal((await api('/api/admin/clusters', { admin: true })).status, 200, 'admin utama tetap masuk')
+
+  // sesudah dikeluarkan, login baru tetap bisa
+  assert.equal((await api('/api/admin/clusters', { headers: { cookie: await login() } })).status, 200)
+
+  // tidak bisa mengeluarkan sesi sendiri lewat endpoint ini
+  const me = (await api('/api/admin/users', { admin: true })).body.find((u: any) => u.isYou)
+  assert.equal((await api(`/api/admin/users/${me.id}/kick`, { method: 'POST', admin: true, json: {} })).status, 400)
+})
+
+test('ganti password admin sendiri: sesi lain keluar, sesi ini tetap masuk', async () => {
+  const me = (await api('/api/admin/users', { admin: true })).body.find((u: any) => u.isYou)
+  const loginAs = async (password: string) => {
+    const r = await fetch(BASE + '/api/admin/login', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: me.username, password }),
+    })
+    return { status: r.status, cookie: (r.headers.get('set-cookie') ?? '').split(';')[0] }
+  }
+  const other = await loginAs('passw0rd-ok')
+  assert.equal(other.status, 200)
+
+  const chg = await api('/api/admin/password', { method: 'POST', admin: true, json: { current: 'passw0rd-ok', next: 'passw0rd-baru' } })
+  assert.equal(chg.status, 200)
+  const fresh = (chg.res.headers.get('set-cookie') ?? '').split(';')[0]
+  adminCookie = fresh // tes berikutnya memakai cookie admin yang baru
+  assert.equal((await api('/api/admin/clusters', { headers: { cookie: other.cookie } })).status, 401, 'sesi lain harus keluar')
+  assert.equal((await api('/api/admin/clusters', { headers: { cookie: fresh } })).status, 200, 'sesi yang mengganti password tetap masuk')
+
+  // password baru berlaku, yang lama tidak
+  assert.equal((await loginAs('passw0rd-baru')).status, 200)
+  assert.equal((await loginAs('passw0rd-ok')).status, 401)
+})
+
+test('hapus admin: akun hilang, sesinya mati, admin terakhir tidak bisa dihapus', async () => {
+  const users = (await api('/api/admin/users', { admin: true })).body
+  const me = users.find((u: any) => u.isYou)
+  const petugas = users.find((u: any) => u.username === 'petugas')
+
+  const login = await fetch(BASE + '/api/admin/login', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username: 'petugas', password: 'petugas-1234' }),
+  })
+  const cookie2 = (login.headers.get('set-cookie') ?? '').split(';')[0]
+  assert.equal((await api('/api/admin/clusters', { headers: { cookie: cookie2 } })).status, 200)
+
+  // akun sendiri tidak boleh dihapus
+  const selfDel = await api(`/api/admin/users/${me.id}`, { method: 'DELETE', admin: true, json: {} })
+  assert.equal(selfDel.status, 400, 'ditolak: ' + JSON.stringify(selfDel.body))
+
+  const del = await api(`/api/admin/users/${petugas.id}`, { method: 'DELETE', admin: true, json: {} })
+  assert.equal(del.status, 200)
+  assert.equal(del.body.deleted, 'petugas')
+  assert.equal((await api('/api/admin/clusters', { headers: { cookie: cookie2 } })).status, 401, 'cookie admin terhapus harus mati')
+  assert.equal((await api('/api/admin/users', { admin: true })).body.length, 1)
+
+  // Yang tersisa hanya admin terakhir: tidak ada jalan menghapusnya lewat API,
+  // baik oleh dirinya sendiri maupun oleh admin yang sudah dihapus.
+  assert.equal((await api(`/api/admin/users/${me.id}`, { method: 'DELETE', admin: true, json: {} })).status, 400)
+  assert.equal((await api(`/api/admin/users/${me.id}`, { method: 'DELETE', headers: { cookie: cookie2 }, json: {} })).status, 401)
+  assert.equal((await api('/api/admin/users', { admin: true })).body.length, 1)
+})

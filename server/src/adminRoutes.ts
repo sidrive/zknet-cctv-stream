@@ -57,10 +57,10 @@ adminRouter.post('/setup', loginLimiter, (req, res) => {
   const p = credentials.safeParse(req.body)
   if (!p.success) return res.status(400).json({ error: p.error.issues[0].message })
   const id = newId()
-  db.prepare('INSERT INTO admins(id,username,password_hash) VALUES(?,?,?)').run(
+  db.prepare("INSERT INTO admins(id,username,password_hash,last_login_at) VALUES(?,?,?,datetime('now'))").run(
     id, p.data.username, bcrypt.hashSync(p.data.password, 12),
   )
-  res.cookie(ADMIN_COOKIE, signAdmin(id, p.data.username), cookieOpts())
+  res.cookie(ADMIN_COOKIE, signAdmin(id, p.data.username, 1), cookieOpts())
   res.status(201).json({ ok: true })
 })
 
@@ -68,10 +68,11 @@ adminRouter.post('/login', loginLimiter, (req, res) => {
   const p = credentials.pick({ username: true }).extend({ password: z.string().min(1) }).safeParse(req.body)
   if (!p.success) return res.status(400).json({ error: 'Input tidak valid' })
   const row = db.prepare('SELECT * FROM admins WHERE username = ?').get(p.data.username) as
-    | { id: string; username: string; password_hash: string } | undefined
+    | { id: string; username: string; password_hash: string; token_version: number } | undefined
   const ok = bcrypt.compareSync(p.data.password, row?.password_hash ?? '$2a$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinv')
   if (!row || !ok) return res.status(401).json({ error: 'Username atau password salah' })
-  res.cookie(ADMIN_COOKIE, signAdmin(row.id, row.username), cookieOpts())
+  db.prepare("UPDATE admins SET last_login_at = datetime('now') WHERE id = ?").run(row.id)
+  res.cookie(ADMIN_COOKIE, signAdmin(row.id, row.username, row.token_version ?? 1), cookieOpts())
   res.json({ ok: true })
 })
 
@@ -86,11 +87,86 @@ adminRouter.use(requireAdmin)
 adminRouter.post('/password', (req, res) => {
   const p = z.object({ current: z.string(), next: credentials.shape.password }).safeParse(req.body)
   if (!p.success) return res.status(400).json({ error: p.error.issues[0].message })
-  const me = (req as unknown as { admin: { id: string } }).admin
-  const row = db.prepare('SELECT password_hash FROM admins WHERE id = ?').get(me.id) as { password_hash: string }
-  if (!bcrypt.compareSync(p.data.current, row.password_hash)) return res.status(403).json({ error: 'Password saat ini salah' })
-  db.prepare('UPDATE admins SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(p.data.next, 12), me.id)
+  const me = (req as unknown as { admin: { id: string; username: string } }).admin
+  const row = db.prepare('SELECT password_hash, token_version FROM admins WHERE id = ?').get(me.id) as
+    | { password_hash: string; token_version: number } | undefined
+  if (!row || !bcrypt.compareSync(p.data.current, row.password_hash)) return res.status(403).json({ error: 'Password saat ini salah' })
+  // Naikkan token_version: sesi lain (mis. di perangkat lain) ikut keluar, lalu cookie
+  // sesi ini diperbarui agar admin yang mengganti password tidak ikut terlempar.
+  const tv = (row.token_version ?? 1) + 1
+  db.prepare('UPDATE admins SET password_hash = ?, token_version = ? WHERE id = ?').run(bcrypt.hashSync(p.data.next, 12), tv, me.id)
+  res.cookie(ADMIN_COOKIE, signAdmin(me.id, me.username, tv), cookieOpts())
   res.json({ ok: true })
+})
+
+// ---------- Admin lain ----------
+// Panel admin bisa dipakai lebih dari satu orang. Setiap akun punya token_version
+// sendiri, jadi menghapus akun atau "keluarkan semua sesi" langsung berlaku tanpa
+// menunggu cookie 12 jam kedaluwarsa.
+
+type AdminRow = { id: string; username: string; created_at: string; last_login_at: string | null; token_version: number }
+const meOf = (req: unknown) => (req as { admin: { id: string; username: string } }).admin
+const adminCountExcept = (id: string) =>
+  (db.prepare('SELECT COUNT(*) c FROM admins WHERE id <> ?').get(id) as { c: number }).c
+
+adminRouter.get('/users', (_req, res) => {
+  const me = meOf(_req)
+  const rows = db.prepare('SELECT id, username, created_at, last_login_at, token_version FROM admins ORDER BY created_at').all() as AdminRow[]
+  res.json(rows.map((r) => ({
+    id: r.id,
+    username: r.username,
+    createdAt: r.created_at,
+    lastLoginAt: r.last_login_at,
+    isYou: r.id === me.id,
+  })))
+})
+
+adminRouter.post('/users', (req, res) => {
+  const p = credentials.safeParse(req.body)
+  if (!p.success) return res.status(400).json({ error: p.error.issues[0].message })
+  if (db.prepare('SELECT 1 FROM admins WHERE username = ?').get(p.data.username)) {
+    return res.status(409).json({ error: 'Username sudah dipakai' })
+  }
+  const id = newId()
+  db.prepare('INSERT INTO admins(id,username,password_hash) VALUES(?,?,?)').run(
+    id, p.data.username, bcrypt.hashSync(p.data.password, 12),
+  )
+  res.status(201).json({ id, username: p.data.username })
+})
+
+const newPassword = z.object({ password: credentials.shape.password })
+
+adminRouter.post('/users/:id/password', (req, res) => {
+  const me = meOf(req)
+  if (req.params.id === me.id) return res.status(400).json({ error: 'Untuk akun sendiri, pakai Ganti password (perlu password lama)' })
+  const p = newPassword.safeParse(req.body)
+  if (!p.success) return res.status(400).json({ error: p.error.issues[0].message })
+  const row = db.prepare('SELECT token_version FROM admins WHERE id = ?').get(req.params.id) as { token_version: number } | undefined
+  if (!row) return res.status(404).json({ error: 'Admin tidak ditemukan' })
+  // Sesi lama akun itu ikut gugur supaya password baru benar-benar berlaku.
+  db.prepare('UPDATE admins SET password_hash = ?, token_version = ? WHERE id = ?')
+    .run(bcrypt.hashSync(p.data.password, 12), (row.token_version ?? 1) + 1, req.params.id)
+  res.json({ ok: true })
+})
+
+adminRouter.post('/users/:id/kick', (req, res) => {
+  const me = meOf(req)
+  if (req.params.id === me.id) return res.status(400).json({ error: 'Itu akun Anda sendiri. Gunakan tombol Keluar untuk mengakhiri sesi ini.' })
+  const row = db.prepare('SELECT token_version FROM admins WHERE id = ?').get(req.params.id) as { token_version: number } | undefined
+  if (!row) return res.status(404).json({ error: 'Admin tidak ditemukan' })
+  db.prepare('UPDATE admins SET token_version = ? WHERE id = ?').run((row.token_version ?? 1) + 1, req.params.id)
+  res.json({ ok: true })
+})
+
+adminRouter.delete('/users/:id', (req, res) => {
+  const me = meOf(req)
+  if (req.params.id === me.id) return res.status(400).json({ error: 'Tidak bisa menghapus akun sendiri' })
+  const row = db.prepare('SELECT username FROM admins WHERE id = ?').get(req.params.id) as { username: string } | undefined
+  if (!row) return res.status(404).json({ error: 'Admin tidak ditemukan' })
+  // Jangan pernah sampai tidak ada admin tersisa — panel jadi tidak bisa dibuka lagi.
+  if (adminCountExcept(req.params.id) === 0) return res.status(409).json({ error: 'Tidak bisa menghapus admin terakhir' })
+  db.prepare('DELETE FROM admins WHERE id = ?').run(req.params.id)
+  res.json({ ok: true, deleted: row.username })
 })
 
 // ---------- Cluster ----------

@@ -82,6 +82,14 @@ export interface AdminSettings {
   site_title: string; site_description: string; embed_origins: string; grant_ttl_hours: string
   embed_api_key: string; active_transcoders: string
 }
+export type AdminUser = {
+  id: string
+  username: string
+  createdAt: string
+  lastLoginAt: string | null
+  isYou: boolean
+}
+
 export const admin = {
   status: () => req<{ needsSetup: boolean; setupTokenRequired: boolean; admin: { username: string } | null }>('GET', '/api/admin/status'),
   setup: (b: { username: string; password: string; setupToken?: string }) => req('POST', '/api/admin/setup', b),
@@ -101,4 +109,10 @@ export const admin = {
   settings: () => req<AdminSettings>('GET', '/api/admin/settings'),
   saveSettings: (b: unknown) => req('PUT', '/api/admin/settings', b),
   rotateKey: () => req<{ embed_api_key: string }>('POST', '/api/admin/settings/rotate-api-key'),
+  // Manajemen admin lain (akun kedua dan seterusnya).
+  users: () => req<AdminUser[]>('GET', '/api/admin/users'),
+  createUser: (b: { username: string; password: string }) => req<{ id: string; username: string }>('POST', '/api/admin/users', b),
+  resetUserPassword: (id: string, b: { password: string }) => req('POST', `/api/admin/users/${id}/password`, b),
+  kickUser: (id: string) => req('POST', `/api/admin/users/${id}/kick`),
+  deleteUser: (id: string) => req<{ ok: true; deleted: string }>('DELETE', `/api/admin/users/${id}`),
 }

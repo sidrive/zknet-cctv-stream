@@ -71,6 +71,10 @@ ensureColumn('cameras', 'access_version', 'INTEGER NOT NULL DEFAULT 1')
 // langsung membuka semua kode.
 ensureColumn('clusters', 'access_code_enc', 'TEXT')
 ensureColumn('cameras', 'access_code_enc', 'TEXT')
+// Manajemen admin: kapan terakhir login, dan versi token untuk "keluarkan semua sesi".
+// Menaikkan token_version membuat semua cookie admin milik akun itu tidak berlaku.
+ensureColumn('admins', 'last_login_at', 'TEXT')
+ensureColumn('admins', 'token_version', 'INTEGER NOT NULL DEFAULT 1')
 
 const DEFAULTS: Record<string, string> = {
   site_title: 'ZKNet CCTV',

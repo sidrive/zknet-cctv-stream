@@ -256,11 +256,19 @@ input:not([type='checkbox']), select, textarea { padding: .55rem .7rem; border-r
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 16px 0; overflow-x: auto; }
 .tabs button { background: none; border: 0; color: var(--muted); padding: .6rem 1rem; cursor: pointer; font: inherit; border-bottom: 2px solid transparent; white-space: nowrap; }
 .tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+/* 4 tab di ponsel: rapatkan sedikit agar semuanya terbaca tanpa digeser. */
+@media (max-width: 640px) { .tabs button { padding: .5rem .55rem; font-size: .88rem; } }
+@media (max-width: 380px) { .tabs button { padding: .45rem .4rem; font-size: .82rem; } }
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
 table { width: 100%; border-collapse: collapse; } th, td { padding: .6rem .8rem; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { color: var(--muted); font-weight: 500; font-size: .82rem; } tr:last-child td { border-bottom: 0; }
 td.actions { white-space: nowrap; text-align: right; }
 td.actions > div { display: inline-flex; gap: 6px; }
+@media (max-width: 640px) {
+  /* Tombol aksi ditumpuk di ponsel supaya tabel tidak perlu digeser ke samping. */
+  td.actions { white-space: normal; }
+  td.actions > div { flex-direction: column; align-items: stretch; }
+}
 
 .auth { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
 .auth-card { width: min(400px, 100%); gap: 12px; }

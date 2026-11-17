@@ -14,6 +14,7 @@ Hub streaming CCTV: **landing page publik**, **panel admin**, akses **gratis ata
 | Sumber | **HLS** (.m3u8), **RTSP/RTMP/SRT** (diubah ke HLS oleh ffmpeg *hanya saat ada penonton*), **MJPEG**, **Embed** iframe (mis. YouTube Live) |
 | Keamanan sumber | URL & kredensial kamera **tidak dikirim ke browser**: server menjadi proxy bertanda tangan (anti-SSRF). Kamera tak terdaftar & kamera di cluster terkunci disembunyikan dari katalog |
 | Admin | Setup admin pertama lewat UI, login, CRUD kamera & cluster, uji tonton, pengaturan situs, ganti password |
+| Beberapa admin | Tab **Admin**: tambah akun, lihat kapan dibuat & terakhir login, reset password, **keluarkan sesi**, hapus akun. Tiap akun punya `token_version`, jadi menghapus akun atau mengeluarkan sesinya berlaku seketika (tidak menunggu cookie 12 jam) |
 | Mini-app | `embed.js` / iframe `/embed`, pembatasan origin (CSP `frame-ancestors`), **SSO grant** dari backend aplikasi host |
 
 ## Aturan akses
