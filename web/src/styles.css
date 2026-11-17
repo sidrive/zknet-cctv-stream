@@ -229,7 +229,29 @@ input:not([type='checkbox']), select, textarea { padding: .55rem .7rem; border-r
 }
 
 .wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; margin-top: 16px; }
-.wall-cell { position: relative; } .wall-name { position: absolute; bottom: 8px; left: 8px; background: rgb(0 0 0 / .6); color: #fff; padding: .1rem .5rem; border-radius: 4px; font-size: .8rem; text-decoration: none; }
+/* Mode dinding: ukuran grid & halaman disimpan di URL (?wall=3x3&page=2). */
+.wall-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.wall-tools__label { font-size: .8rem; color: var(--muted, #8b98ab); letter-spacing: .04em; text-transform: uppercase; }
+.wall-tools__pages { display: flex; align-items: center; gap: 6px; margin-left: 4px; }
+.wall-tools button[disabled] { opacity: .45; cursor: not-allowed; }
+@media (max-width: 640px) {
+  /* Di layar kecil, grid rapat tetap terbaca: buang label panjang. */
+  .wall-tools { gap: 6px; }
+  .wall-tools > .muted.small:not(.wall-tools__hint) { display: none; }
+  .wall-tools__hint { flex-basis: 100%; }
+}
+.wall-cell { position: relative; }
+/* Nama kamera di pojok atas: di sel kecil, pojok bawah dipakai tombol "Coba lagi"
+   pada keadaan galat sehingga keduanya saling menimpa. */
+.wall-name {
+  position: absolute; top: 8px; left: 8px; max-width: calc(100% - 16px);
+  background: rgb(0 0 0 / .62); color: #fff; padding: .1rem .5rem; border-radius: 4px;
+  font-size: .78rem; text-decoration: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Sel dinding lebih kecil: perkecil overlay galat/memuat agar tidak meluber. */
+.player-compact .player-overlay { font-size: .72rem; gap: 6px; padding: 8px; }
+.player-compact .player-overlay .btn { height: 24px; padding: 0 8px; font-size: .7rem; }
 
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 16px 0; overflow-x: auto; }
 .tabs button { background: none; border: 0; color: var(--muted); padding: .6rem 1rem; cursor: pointer; font: inherit; border-bottom: 2px solid transparent; white-space: nowrap; }

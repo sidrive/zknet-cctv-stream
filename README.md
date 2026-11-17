@@ -8,8 +8,9 @@ Hub streaming CCTV: **landing page publik**, **panel admin**, akses **gratis ata
 
 | Area | Detail |
 |---|---|
-| Landing page | Daftar cluster & kamera umum, pencarian, halaman cluster (daftar / *mode dinding* multi-kamera), halaman tonton per kamera |
-| Akses | Per **kamera** dan per **cluster**: `Gratis` atau `Perlu kode`. Kode di-hash (bcrypt), percobaan dibatasi (rate limit) |
+| Landing page | Daftar cluster & kamera umum, pencarian, halaman cluster (daftar / *mode dinding* 2×2–4×4 dengan paginasi), halaman tonton per kamera |
+| Mode dinding | Pilihan grid & halaman tersimpan di URL (`/c/<slug>?wall=3x3&page=2`) sehingga bisa di-refresh atau dibagikan; hanya halaman aktif yang memuat stream |
+| Akses | Per **kamera** dan per **cluster**: `Gratis` atau `Perlu kode`. Kode disimpan terenkripsi + hash bcrypt, bisa dicabut seketika (lihat *Kode akses* di bawah), percobaan dibatasi (rate limit) |
 | Sumber | **HLS** (.m3u8), **RTSP/RTMP/SRT** (diubah ke HLS oleh ffmpeg *hanya saat ada penonton*), **MJPEG**, **Embed** iframe (mis. YouTube Live) |
 | Keamanan sumber | URL & kredensial kamera **tidak dikirim ke browser**: server menjadi proxy bertanda tangan (anti-SSRF). Kamera tak terdaftar & kamera di cluster terkunci disembunyikan dari katalog |
 | Admin | Setup admin pertama lewat UI, login, CRUD kamera & cluster, uji tonton, pengaturan situs, ganti password |

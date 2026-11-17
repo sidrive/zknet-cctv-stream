@@ -6,7 +6,7 @@ Setiap item menyebut lokasi kode supaya bisa langsung dikerjakan.
 Audit dilakukan pada commit `57fbe38` dengan server dijalankan lokal (`data/cctv.db`: 2 cluster, 150 kamera, 149 HLS + 1 RTSP).
 
 **Progres:** #1 peta, #2 halaman status, #3 statistik online, #10 badge status, #11 health detail selesai
-(Sprint 1 + peta). #4, #5, #6, #7, #14 selesai (Sprint 2). #12 selesai. Sisa: #8, #9, #13, #15.
+(Sprint 1 + peta). #4, #5, #6, #7, #14 selesai (Sprint 2). #12 dan #8 selesai. Sisa: #9, #13, #15.
 
 ## Ringkasan
 
@@ -19,7 +19,7 @@ Audit dilakukan pada commit `57fbe38` dengan server dijalankan lokal (`data/cctv
 | 5 | ~~**Avatar / menu pengguna**~~ | **selesai** — sekarang tautan ke `/admin` berlabel "Masuk admin" | ✅ |
 | 6 | ~~**"Lihat Semua →"** pada Daftar Cluster~~ | **selesai** — halaman `/cluster` dengan pencarian + saringan Gratis/Berkode | ✅ |
 | 7 | ~~**Pintasan ⌘ K** pada kolom cari~~ | **selesai** — ⌘K/Ctrl+K memfokuskan kolom, Escape mengosongkan | ✅ |
-| 8 | **Mode Dinding** di halaman cluster | maksimal 9 kamera & tidak tersimpan di URL | P1 |
+| 8 | ~~**Mode Dinding** di halaman cluster~~ | **selesai** — grid 2×2/3×3/4×4 + paginasi, tersimpan di URL (`?wall=3x3&page=2`), hanya halaman aktif yang memuat stream | ✅ |
 | 9 | **Manajemen admin** di panel admin | hanya bisa ganti password diri sendiri | P1 |
 | 10 | **Status per kamera (online/offline)** | selalu tampil "LIVE"/"Online", tidak pernah cek sumber | P1 |
 | 11 | **Log/riwayat & health detail** | `/api/health` hanya `{ok:true}` | P2 |
