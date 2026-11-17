@@ -139,6 +139,26 @@ Setelah itu, di panel admin → *Embed & Pengaturan*, isi "Origin yang boleh men
 ### Update berikutnya
 Laptop: `npm run release`. STB: `/opt/zknet-cctv-stream/deploy/stb-update.sh`.
 
+### Mengisi koordinat kamera (sekali, setelah update yang menambahkan /peta)
+Migrasi aplikasi hanya **menambah kolom** `lat`/`lng` yang masih kosong, jadi `/peta` akan
+menampilkan "0 kamera berkoordinat" sampai kolom itu diisi. Isinya tidak perlu internet —
+`scripts/camera-coords.json` ikut repo.
+
+```bash
+/opt/zknet-cctv-stream/deploy/stb-apply-coords.sh
+```
+
+Skrip itu: membaca `DATA_DIR` dari `.env`, **membuat backup** `cctv.db.pre-coords-<waktu>.bak`,
+menampilkan pratinjau (dry-run), lalu menulis koordinat. Aman diulang — koordinat yang sudah
+ada tidak ditimpa, jadi koreksi manual lewat panel admin tetap utuh.
+
+Bila ada kamera yang tidak dikenali sumbernya (mis. namanya Anda ubah), skrip menampilkannya
+di daftar "Tanpa koordinat di sumber". Isi manual: *Admin → Kamera → Edit → Latitude/Longitude*
+(atau tombol **Pilih dari peta…**). Kamera tanpa koordinat tidak digambar di `/peta`, bukan
+ditaruh di 0,0.
+
+Untuk menimpa semua koordinat dari sumber: `deploy/stb-apply-coords.sh --force`.
+
 ### Catatan khusus STB (S905x)
 * **Jangan centang "Transcode"** pada kamera RTSP: encoding H.264 di CPU STB sangat berat. Kamera H.265 butuh transcode, jadi pakai sumber H.264 (substream) bila ada.
 * Upload ISP = batas jumlah penonton bersamaan (1 penonton ≈ 1× bitrate stream).
