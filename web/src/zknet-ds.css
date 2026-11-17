@@ -198,7 +198,46 @@ body.zk { margin: 0; background: var(--zk-grad-page); color: var(--zk-text);
   background: none; border: 0; color: var(--zk-text); border-radius: var(--zk-r-pill); cursor: pointer; }
 .zk-icon-btn:hover { background: var(--zk-surface-2); }
 .zk-icon-btn .zk-dot { position: absolute; top: 9px; right: 11px; width: 9px; height: 9px; background: var(--zk-live); border-radius: 50%; border: 2px solid var(--zk-bg); }
-.zk-avatar { width: 46px; height: 46px; border-radius: 50%; background: #c9d6f2; color: #4c628f; display: grid; place-items: center; }
+.zk-avatar { width: 46px; height: 46px; border-radius: 50%; background: #c9d6f2; color: #4c628f; display: grid; place-items: center; text-decoration: none; }
+.zk-avatar:hover { background: #dbe5fa; }
+
+/* ---------- Notifikasi (topbar) ----------------------------------------- */
+.zk-notif { position: relative; }
+.zk-notif__backdrop { position: fixed; inset: 0; z-index: 40; }
+.zk-notif__panel {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 41;
+  width: 300px; max-width: calc(100vw - 24px);
+  display: grid; gap: var(--zk-s-2);
+  padding: var(--zk-s-3);
+  background: var(--zk-surface); border: 1px solid var(--zk-border);
+  border-radius: var(--zk-r-md); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+.zk-notif__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--zk-s-3); }
+.zk-notif__head strong { font-size: var(--zk-fs-sm); }
+.zk-notif__head span { font-size: var(--zk-fs-xs); color: var(--zk-text-muted); }
+.zk-notif__empty { margin: 0; font-size: var(--zk-fs-sm); color: var(--zk-text-muted); }
+.zk-notif__note { margin: 0; font-size: var(--zk-fs-xs); color: var(--zk-text-muted); }
+.zk-notif__list { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.zk-notif__list li { display: flex; align-items: center; justify-content: space-between; gap: var(--zk-s-3); }
+.zk-notif__list a { color: var(--zk-text); font-size: var(--zk-fs-sm); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zk-notif__list a:hover { color: var(--zk-primary-hi); }
+.zk-notif__list em { font-style: normal; font-size: var(--zk-fs-xs); color: var(--zk-live); flex: none; }
+.zk-notif__more { font-size: var(--zk-fs-xs); color: var(--zk-text-muted); }
+.zk-notif__foot { font-size: var(--zk-fs-xs); color: var(--zk-primary-hi); text-decoration: none; }
+.zk-notif__foot:hover { text-decoration: underline; }
+
+/* ---------- Halaman daftar cluster -------------------------------------- */
+.zk-cluster-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--zk-s-3); margin-bottom: var(--zk-s-4); }
+.zk-cluster-tools .zk-search { flex: 1 1 220px; }
+.zk-chips { display: flex; gap: var(--zk-s-2); }
+.zk-chip-btn {
+  height: 34px; padding: 0 var(--zk-s-3);
+  border-radius: var(--zk-r-pill); cursor: pointer;
+  border: 1px solid var(--zk-border); background: var(--zk-surface-2);
+  color: var(--zk-text-muted); font-size: var(--zk-fs-sm);
+}
+.zk-chip-btn:hover { color: var(--zk-text); }
+.zk-chip-btn.is-on { border-color: var(--zk-primary-hi); color: var(--zk-primary-hi); background: rgba(56, 225, 255, 0.1); }
 
 .zk-sidebar__close, .zk-icon-btn.zk-sidebar__close { display: none; }
 .zk-menu-btn, .zk-icon-btn.zk-menu-btn { display: none; }

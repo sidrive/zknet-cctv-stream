@@ -54,8 +54,14 @@ before(async () => {
     res.writeHead(404).end()
   }).listen(18081)
 
+  // WEB_DIR tiruan berisi index.html supaya cabang SPA (rute dikenal 200, sisanya 404) ikut diuji.
+  const webDir = path.join(tmp, 'web')
+  fs.mkdirSync(webDir, { recursive: true })
+  fs.writeFileSync(path.join(webDir, 'index.html'), '<!doctype html><title>SPA</title>')
+  fs.writeFileSync(path.join(webDir, 'asset.js'), 'console.log(1)')
+
   server = spawn(process.execPath, ['--import', 'tsx', 'src/index.ts'], {
-    env: { ...process.env, PORT: String(PORT), DATA_DIR: path.join(tmp, 'data'), STREAM_TMP_DIR: path.join(tmp, 'ff'), WEB_DIR: path.join(tmp, 'noweb') },
+    env: { ...process.env, PORT: String(PORT), DATA_DIR: path.join(tmp, 'data'), STREAM_TMP_DIR: path.join(tmp, 'ff'), WEB_DIR: webDir },
     stdio: 'ignore',
   })
   for (let i = 0; i < 60; i++) {
@@ -322,4 +328,28 @@ test('filter cluster di peta: katalog memberi clusterId + koordinat untuk pengel
   assert.deepEqual(inB.map((c: any) => c.name).sort(), ['A2', 'B1'])
   const spanB = Math.abs(inB[0].lat - inB[1].lat)
   assert.ok(spanB > 0, 'sebaran koordinat cluster B harus punya luas')
+})
+
+test('SPA: rute dikenal 200, URL tak dikenal 404 (bukan 200 palsu)', async () => {
+  const html = { accept: 'text/html' }
+  const known = ['/', '/status', '/peta', '/cluster', '/embed', '/c/umum', '/v/abc', '/admin', '/admin/kamera']
+  for (const p of known) {
+    const r = await fetch(BASE + p, { headers: html })
+    assert.equal(r.status, 200, `${p} seharusnya 200`)
+    assert.match(await r.text(), /SPA/, `${p} harus mengirim index.html`)
+  }
+  // Aset statis tetap dilayani.
+  assert.equal((await fetch(BASE + '/asset.js')).status, 200)
+
+  const unknown = ['/tidak-ada', '/petaa', '/c', '/v', '/adminx', '/status/lama']
+  for (const p of unknown) {
+    const r = await fetch(BASE + p, { headers: html })
+    assert.equal(r.status, 404, `${p} seharusnya 404`)
+    assert.match(await r.text(), /SPA/, `${p} tetap menampilkan halaman SPA`)
+  }
+
+  // Endpoint API yang tidak ada tetap JSON 404, bukan HTML.
+  const api404 = await fetch(BASE + '/api/tidak-ada')
+  assert.equal(api404.status, 404)
+  assert.match(api404.headers.get('content-type') ?? '', /json/)
 })

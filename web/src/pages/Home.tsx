@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import UnlockDialog from '../components/UnlockDialog'
 import { useCatalog } from '../hooks'
@@ -12,6 +12,8 @@ export default function Home() {
   const [unlock, setUnlock] = useState<Cluster | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [notifOpen, setNotifOpen] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
 
   const term = q.trim().toLowerCase()
   const match = (s: string) => s.toLowerCase().includes(term)
@@ -33,6 +35,27 @@ export default function Home() {
   const onlineCount = data?.cameras.filter((camera) => camera.status === 'online').length ?? 0
   const offlineCount = data?.cameras.filter((camera) => camera.status === 'offline').length ?? 0
   const uncheckedCount = data?.cameras.filter((camera) => (camera.status ?? 'unknown') === 'unknown').length ?? 0
+
+  // Pintasan ⌘K / Ctrl+K memfokuskan kolom cari; Escape mengosongkan & menutup notifikasi.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        searchRef.current?.focus()
+        searchRef.current?.select()
+        return
+      }
+      if (e.key === 'Escape') {
+        setNotifOpen(false)
+        if (document.activeElement === searchRef.current) {
+          setQ('')
+          searchRef.current?.blur()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   if (error) return <div className="page"><p className="error">{error}</p></div>
   if (!data) return <div className="page"><p className="muted">Memuat…</p></div>
@@ -83,12 +106,56 @@ export default function Home() {
           </div>
           <label className="zk-search">
             <svg className="zk-icon"><use href="#i-search"/></svg>
-            <input type="search" placeholder="Cari kamera, lokasi, atau cluster…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari kamera, lokasi, atau cluster" />
+            <input ref={searchRef} type="search" placeholder="Cari kamera, lokasi, atau cluster…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari kamera, lokasi, atau cluster" />
             <span className="zk-kbd">⌘ K</span>
           </label>
           <div className="zk-topbar__actions">
-            <button className="zk-icon-btn" aria-label="Notifikasi"><svg className="zk-icon"><use href="#i-bell"/></svg><span className="zk-dot"></span></button>
-            <div className="zk-avatar"><svg className="zk-icon"><use href="#i-user"/></svg></div>
+            <div className="zk-notif">
+              <button
+                className="zk-icon-btn"
+                aria-label="Notifikasi"
+                aria-expanded={notifOpen}
+                onClick={() => setNotifOpen((v) => !v)}
+              >
+                <svg className="zk-icon"><use href="#i-bell"/></svg>
+                {/* Titik merah hanya bila memang ada kamera bermasalah. */}
+                {offlineCount > 0 && <span className="zk-dot"></span>}
+              </button>
+              {notifOpen && (
+                <>
+                  <div className="zk-notif__backdrop" onClick={() => setNotifOpen(false)} aria-hidden="true" />
+                  <div className="zk-notif__panel" role="dialog" aria-label="Notifikasi">
+                    <div className="zk-notif__head">
+                      <strong>Notifikasi</strong>
+                      {data.lastCheckAt && <span>{formatChecked(data.lastCheckAt)}</span>}
+                    </div>
+                    {offlineCount === 0 && uncheckedCount === 0 && (
+                      <p className="zk-notif__empty">Semua kamera terpantau normal.</p>
+                    )}
+                    {offlineCount > 0 && (
+                      <ul className="zk-notif__list">
+                        {data.cameras.filter((c) => c.status === 'offline').slice(0, 5).map((c) => (
+                          <li key={c.id}>
+                            <Link to={`/v/${c.id}`} onClick={() => setNotifOpen(false)}>{c.name}</Link>
+                            <em>offline</em>
+                          </li>
+                        ))}
+                        {offlineCount > 5 && <li className="zk-notif__more">+{offlineCount - 5} kamera lain</li>}
+                      </ul>
+                    )}
+                    {uncheckedCount > 0 && (
+                      <p className="zk-notif__note">{uncheckedCount} kamera belum diperiksa.</p>
+                    )}
+                    <Link className="zk-notif__foot" to="/status" onClick={() => setNotifOpen(false)}>
+                      Lihat status jaringan →
+                    </Link>
+                  </div>
+                </>
+              )}
+            </div>
+            <Link to="/admin" className="zk-avatar" aria-label="Masuk admin" title="Masuk admin">
+              <svg className="zk-icon"><use href="#i-user"/></svg>
+            </Link>
           </div>
         </header>
 
@@ -120,7 +187,13 @@ export default function Home() {
         <div className="zk-grid-split">
           <div className="zk-stack">
             <section className="zk-panel" id="cluster">
-              <div className="zk-panel__head"><h2 className="zk-h2"><svg className="zk-icon"><use href="#i-users"/></svg>Daftar Cluster</h2><a className="zk-link" href="#">Lihat Semua &rarr;</a></div>
+              <div className="zk-panel__head">
+                <h2 className="zk-h2"><svg className="zk-icon"><use href="#i-users"/></svg>Daftar Cluster</h2>
+                {/* Halaman /cluster punya pencarian + filter Gratis/Berkode sendiri. */}
+                {data.clusters.length > 0 && (
+                  <Link className="zk-link" to="/cluster">Lihat Semua &rarr;</Link>
+                )}
+              </div>
               <div className="zk-stack">
                 {clusters.map((cluster, i) => (
                   <ClusterRow key={cluster.id} cluster={cluster} index={i} onOpen={() => (cluster.locked && !cluster.unlocked ? setUnlock(cluster) : nav(`/c/${cluster.slug}`))} />
