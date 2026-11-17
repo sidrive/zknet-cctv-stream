@@ -1,8 +1,9 @@
 import jwt from 'jsonwebtoken';
-import { jwtSecret } from './db.js';
+import { db, jwtSecret } from './db.js';
 export const ADMIN_COOKIE = 'zk_admin';
-export function signAdmin(adminId, username) {
-    return jwt.sign({ typ: 'admin', sub: adminId, u: username }, jwtSecret, { expiresIn: '12h' });
+/** `tv` = token_version akun saat cookie dibuat; naikkan untuk memaksa login ulang. */
+export function signAdmin(adminId, username, tokenVersion = 1) {
+    return jwt.sign({ typ: 'admin', sub: adminId, u: username, tv: tokenVersion }, jwtSecret, { expiresIn: '12h' });
 }
 export function adminFromRequest(req) {
     const t = req.cookies?.[ADMIN_COOKIE];
@@ -12,7 +13,16 @@ export function adminFromRequest(req) {
         const p = jwt.verify(t, jwtSecret);
         if (p.typ !== 'admin')
             return null;
-        return { id: p.sub, username: p.u };
+        // Cek ke database supaya admin yang dihapus atau dikeluarkan segera kehilangan akses,
+        // tidak menunggu cookie 12 jam kedaluwarsa.
+        const row = db.prepare('SELECT username, token_version FROM admins WHERE id = ?').get(p.sub);
+        if (!row)
+            return null;
+        // Cookie lama (sebelum ada token_version) dianggap versi 1 agar update ini tidak
+        // memaksa semua admin login ulang.
+        if ((p.tv ?? 1) !== (row.token_version ?? 1))
+            return null;
+        return { id: p.sub, username: row.username };
     }
     catch {
         return null;
