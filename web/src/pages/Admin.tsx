@@ -199,7 +199,7 @@ function Admins() {
 // ---------------- Kamera ----------------
 const EMPTY_CAM = {
   name: '', description: '', location: '', clusterId: '' as string, sourceType: 'hls', sourceUrl: '',
-  proxy: true, transcode: false, listed: true, enabled: true, sort: 0, accessMode: 'public', accessCode: '',
+  proxy: true, transcode: false, listed: true, enabled: true, sort: '0' as string, accessMode: 'public', accessCode: '',
   lat: '' as string, lng: '' as string,
 }
 const SOURCE_HELP: Record<string, string> = {
@@ -217,21 +217,39 @@ function Cameras({ cameras, clusters, reload }: { cameras: AdminCamera[]; cluste
     if (!confirm(`Hapus kamera "${c.name}"?`)) return
     await admin.deleteCamera(c.id); reload()
   }
+
+  // Geser satu langkah di dalam cluster yang sama. Server menerima seluruh urutan lalu
+  // memberi sort 10, 20, 30… sehingga hasilnya pasti, termasuk saat banyak sort masih sama.
+  const move = async (c: AdminCamera, dir: -1 | 1) => {
+    const group = cameras.filter((x) => x.clusterId === c.clusterId)
+    const i = group.findIndex((x) => x.id === c.id)
+    const j = i + dir
+    if (j < 0 || j >= group.length) return
+    const ids = group.map((x) => x.id)
+    ;[ids[i], ids[j]] = [ids[j], ids[i]]
+    await admin.reorderCameras(ids)
+    reload()
+  }
+
   return (
     <section>
       <div className="row between"><h2>Kamera</h2><button className="btn btn-primary" onClick={() => setEditing('new')}>+ Tambah kamera</button></div>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Nama</th><th>Cluster</th><th>Sumber</th><th>Akses</th><th>Status</th><th /></tr></thead>
+          <thead><tr><th>Nama</th><th>Cluster</th><th className="col-hide-sm">Sumber</th><th>Akses</th><th className="col-hide-sm">Status</th><th /></tr></thead>
           <tbody>
             {cameras.map((c) => (
               <tr key={c.id}>
                 <td><strong>{c.name}</strong><div className="muted small">{c.location}</div></td>
                 <td>{clusterName(c.clusterId)}</td>
-                <td>{c.sourceType.toUpperCase()}</td>
+                <td className="col-hide-sm">{c.sourceType.toUpperCase()}</td>
                 <td><span className={`chip ${c.accessMode === 'protected' ? 'chip-lock' : 'chip-free'}`}>{c.accessMode === 'protected' ? '🔒 Kode' : 'Gratis'}</span></td>
-                <td>{c.enabled ? (c.listed ? 'Aktif' : 'Aktif (tak terdaftar)') : 'Nonaktif'}</td>
+                <td className="col-hide-sm">{c.enabled ? (c.listed ? 'Aktif' : 'Aktif (tak terdaftar)') : 'Nonaktif'}</td>
                 <td className="actions"><div>
+                  <button className="btn btn-sm" title="Naikkan urutan" aria-label={`Naikkan ${c.name}`}
+                    onClick={() => move(c, -1)}>↑</button>
+                  <button className="btn btn-sm" title="Turunkan urutan" aria-label={`Turunkan ${c.name}`}
+                    onClick={() => move(c, 1)}>↓</button>
                   <button className="btn btn-sm" onClick={() => setPreview(c)}>Uji</button>
                   <button className="btn btn-sm" onClick={() => setEditing(c)}>Edit</button>
                   <button className="btn btn-sm btn-danger" onClick={() => remove(c)}>Hapus</button>
@@ -303,6 +321,9 @@ function CameraForm({ cam, clusters, onClose, onSaved, onChanged }: { cam: Admin
               <option value="">— Tanpa cluster —</option>
               {clusters.map((c) => <option key={c.id} value={c.id}>{c.name}{c.accessMode === 'protected' ? ' 🔒' : ''}</option>)}
             </select></label>
+          <label className="field"><span>Urutan</span>
+            <input type="number" step={1} value={f.sort} onChange={(e) => set('sort', e.target.value)} />
+            <small className="muted">Angka kecil tampil lebih dulu. Sama = urut nama.</small></label>
           <label className="field"><span>Tipe sumber</span>
             <select value={f.sourceType} onChange={(e) => set('sourceType', e.target.value)}>
               <option value="hls">HLS (.m3u8)</option><option value="rtsp">RTSP / RTMP / SRT (via ffmpeg)</option>
@@ -505,7 +526,7 @@ function Clusters({ clusters, reload }: { clusters: AdminCluster[]; reload: () =
 }
 
 function ClusterForm({ cluster, onClose, onSaved, onChanged }: { cluster: AdminCluster | null; onClose: () => void; onSaved: () => void; onChanged: () => void }) {
-  const [f, setF] = useState({ name: cluster?.name ?? '', slug: cluster?.slug ?? '', description: cluster?.description ?? '', sort: cluster?.sort ?? 0, accessMode: cluster?.accessMode ?? 'public', accessCode: '' })
+  const [f, setF] = useState({ name: cluster?.name ?? '', slug: cluster?.slug ?? '', description: cluster?.description ?? '', sort: String(cluster?.sort ?? 0), accessMode: cluster?.accessMode ?? 'public', accessCode: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -523,6 +544,9 @@ function ClusterForm({ cluster, onClose, onSaved, onChanged }: { cluster: AdminC
         <label className="field"><span>Nama</span><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value, slug: cluster ? f.slug : slugify(e.target.value) })} required /></label>
         <label className="field"><span>Slug (URL)</span><input value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value })} required pattern="[a-z0-9\-]+" /></label>
         <label className="field"><span>Deskripsi</span><input value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></label>
+        <label className="field"><span>Urutan</span>
+          <input type="number" step={1} value={f.sort} onChange={(e) => setF({ ...f, sort: e.target.value })} />
+          <small className="muted">Angka kecil tampil lebih dulu di beranda. Sama = urut nama.</small></label>
         <label className="field"><span>Akses cluster</span>
           <select value={f.accessMode} onChange={(e) => setF({ ...f, accessMode: e.target.value as 'public' | 'protected' })}>
             <option value="public">Gratis (publik)</option><option value="protected">Perlu kode/password</option>

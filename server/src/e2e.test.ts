@@ -565,3 +565,63 @@ test('hapus admin: akun hilang, sesinya mati, admin terakhir tidak bisa dihapus'
   assert.equal((await api(`/api/admin/users/${me.id}`, { method: 'DELETE', headers: { cookie: cookie2 }, json: {} })).status, 401)
   assert.equal((await api('/api/admin/users', { admin: true })).body.length, 1)
 })
+
+test('urutan (sort): angka kecil lebih dulu untuk cluster dan kamera, bisa diubah dari form', async () => {
+  // Cluster: "Belakang" dibuat lebih dulu tetapi sort lebih besar → harus tampil setelah "Depan".
+  const belakang = await api('/api/admin/clusters', { method: 'POST', admin: true, json: { name: 'Belakang', slug: 'urut-belakang', sort: 9 } })
+  const depan = await api('/api/admin/clusters', { method: 'POST', admin: true, json: { name: 'Depan', slug: 'urut-depan', sort: 1 } })
+  assert.equal(belakang.status, 201)
+  const cat1 = await api('/api/catalog')
+  const slugs = cat1.body.clusters.map((c: any) => c.slug)
+  assert.ok(slugs.indexOf('urut-depan') < slugs.indexOf('urut-belakang'), 'cluster sort 1 harus sebelum sort 9')
+
+  // Kamera: nama sengaja dibalik agar terbukti sort yang menentukan, bukan abjad.
+  const mk = (name: string, sort: number) => api('/api/admin/cameras', {
+    method: 'POST', admin: true,
+    json: { name, sourceType: 'mjpeg', sourceUrl: 'http://127.0.0.1:18081/mjpeg', clusterId: depan.body.id, sort },
+  })
+  const zeta = await mk('Zeta', 20)
+  const alfa = await mk('Alfa', 10)
+  const names = async () =>
+    (await api('/api/catalog')).body.cameras.filter((c: any) => c.clusterId === depan.body.id).map((c: any) => c.name)
+  assert.deepEqual(await names(), ['Alfa', 'Zeta'], 'sort 10 harus sebelum sort 20 meski namanya Z…')
+
+  // Seperti tombol ↑ di panel: simpan ulang dengan sort lebih kecil → pindah ke atas.
+  const up = await api(`/api/admin/cameras/${zeta.body.id}`, { method: 'PUT', admin: true, json: {
+    name: 'Zeta', sourceType: 'mjpeg', sourceUrl: 'http://127.0.0.1:18081/mjpeg', clusterId: depan.body.id, sort: 5,
+  } })
+  assert.equal(up.status, 200)
+  assert.deepEqual(await names(), ['Zeta', 'Alfa'], 'setelah dinaikkan, Zeta tampil lebih dulu')
+
+  // Form mengirim sort sebagai teks; server harus menolak nilai bukan bilangan bulat.
+  const bad = await api(`/api/admin/cameras/${alfa.body.id}`, { method: 'PUT', admin: true, json: {
+    name: 'Alfa', sourceType: 'mjpeg', sourceUrl: 'http://127.0.0.1:18081/mjpeg', sort: 'abc',
+  } })
+  assert.equal(bad.status, 400)
+})
+
+test('urut ulang kamera: satu permintaan menentukan urutan persis walau sort semula sama', async () => {
+  const cl = await api('/api/admin/clusters', { method: 'POST', admin: true, json: { name: 'Reorder', slug: 'reorder' } })
+  const mk = (name: string) => api('/api/admin/cameras', {
+    method: 'POST', admin: true,
+    json: { name, sourceType: 'mjpeg', sourceUrl: 'http://127.0.0.1:18081/mjpeg', clusterId: cl.body.id, sort: 0 },
+  })
+  const a = await mk('Satu'); const b = await mk('Dua'); const c = await mk('Tiga')
+  // id di luar klaster ini tidak boleh ikut berubah
+  const other = await api('/api/admin/cameras', { method: 'POST', admin: true, json: { name: 'Luar', sourceType: 'mjpeg', sourceUrl: 'http://127.0.0.1:18081/mjpeg', sort: 77 } })
+
+  const names = async () =>
+    (await api('/api/catalog')).body.cameras.filter((x: any) => x.clusterId === cl.body.id).map((x: any) => x.name)
+  assert.deepEqual(await names(), ['Dua', 'Satu', 'Tiga']) // sort sama → urut nama
+
+  const ro = await api('/api/admin/cameras/reorder', { method: 'POST', admin: true, json: { ids: [c.body.id, b.body.id, a.body.id] } })
+  assert.equal(ro.status, 200)
+  assert.deepEqual(await names(), ['Tiga', 'Dua', 'Satu'])
+  assert.equal((await api('/api/catalog')).body.cameras.find((x: any) => x.id === other.body.id).name, 'Luar')
+  const otherSort = (await api('/api/admin/cameras', { admin: true })).body.find((x: any) => x.id === other.body.id).sort
+  assert.equal(otherSort, 77, 'sort kamera di luar daftar tidak boleh tersentuh')
+
+  // tanpa login & daftar kosong ditolak
+  assert.equal((await api('/api/admin/cameras/reorder', { method: 'POST', json: { ids: [a.body.id] } })).status, 401)
+  assert.equal((await api('/api/admin/cameras/reorder', { method: 'POST', admin: true, json: { ids: [] } })).status, 400)
+})

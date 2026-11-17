@@ -381,6 +381,18 @@ function clusterExists(id: string | null) {
   return id === null || !!db.prepare('SELECT 1 FROM clusters WHERE id = ?').get(id)
 }
 
+// Urut ulang sekaligus: satu daftar id (sudah dalam urutan yang diinginkan) → sort 10, 20, 30…
+// Dipakai tombol ↑/↓ di panel. Menulis semua id dalam satu transaksi supaya tidak ada
+// urutan setengah jadi, dan tetap benar walau banyak kamera punya sort yang sama.
+adminRouter.post('/cameras/reorder', (req, res) => {
+  const p = z.object({ ids: z.array(z.string()).min(1).max(1000) }).safeParse(req.body)
+  if (!p.success) return res.status(400).json({ error: 'Daftar id tidak valid' })
+  const upd = db.prepare('UPDATE cameras SET sort = ? WHERE id = ?')
+  const apply = db.transaction((ids: string[]) => { ids.forEach((id, i) => upd.run((i + 1) * 10, id)) })
+  apply(p.data.ids)
+  res.json({ ok: true })
+})
+
 adminRouter.post('/cameras', (req, res) => {
   const p = cameraBody.safeParse(req.body)
   if (!p.success) return res.status(400).json({ error: p.error.issues[0].message })

@@ -265,6 +265,8 @@ th { color: var(--muted); font-weight: 500; font-size: .82rem; } tr:last-child t
 td.actions { white-space: nowrap; text-align: right; }
 td.actions > div { display: inline-flex; gap: 6px; }
 @media (max-width: 640px) {
+  /* Kolom sekunder disembunyikan di ponsel agar tabel admin tidak perlu digeser. */
+  .col-hide-sm { display: none; }
   /* Tombol aksi ditumpuk di ponsel supaya tabel tidak perlu digeser ke samping. */
   td.actions { white-space: normal; }
   td.actions > div { flex-direction: column; align-items: stretch; }

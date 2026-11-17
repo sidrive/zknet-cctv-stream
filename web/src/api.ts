@@ -104,6 +104,7 @@ export const admin = {
   cameras: () => req<AdminCamera[]>('GET', '/api/admin/cameras'),
   saveCamera: (id: string | null, b: unknown) => req<AdminCamera>(id ? 'PUT' : 'POST', id ? `/api/admin/cameras/${id}` : '/api/admin/cameras', b),
   deleteCamera: (id: string) => req('DELETE', `/api/admin/cameras/${id}`),
+  reorderCameras: (ids: string[]) => req('POST', '/api/admin/cameras/reorder', { ids }),
   cameraCode: (id: string) => req<{ code: string }>('GET', `/api/admin/cameras/${id}/code`),
   revokeCamera: (id: string, b: { rotate?: boolean; accessCode?: string }) => req<RevokeResult>('POST', `/api/admin/cameras/${id}/revoke`, b),
   settings: () => req<AdminSettings>('GET', '/api/admin/settings'),
