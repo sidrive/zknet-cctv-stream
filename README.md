@@ -191,6 +191,30 @@ ditaruh di 0,0.
 
 Untuk menimpa semua koordinat dari sumber: `deploy/stb-apply-coords.sh --force`.
 
+### Jika panel admin menampilkan "Endpoint tidak ditemukan"
+
+Artinya **proses server yang berjalan masih build lama**, bukan salah pakai: `git pull`
+sudah mengambil `dist` baru tetapi PM2 belum me-restart prosesnya. Cek dan perbaiki:
+
+```bash
+cd /home/sidrive/zknet-cctv-stream
+git log --oneline -1                 # commit terakhir harus sama dengan yang di-push
+curl -s localhost:8080/api/health    # lihat version, buildAt, uptimeSec
+pm2 restart zknet-cctv               # jalankan ulang dengan build terbaru
+curl -s localhost:8080/api/health    # startedAt/uptime harus baru, buildAt ikut baru
+```
+
+Kalau `buildAt` masih lama padahal `git log` sudah baru, biasanya ada **proses lama yang
+masih memegang port** (mis. sisa `node server/dist/index.js` yang dijalankan manual):
+
+```bash
+ss -lptn 'sport = :8080'             # lihat PID pemakai port
+pm2 list                             # pastikan hanya satu proses zknet-cctv
+```
+
+Panel admin sekarang juga menerjemahkan galat itu menjadi pesan berisi langkah di atas,
+dan tombol ↑/↓ di daftar kamera menampilkan galatnya langsung di atas tabel.
+
 ### Catatan khusus STB (S905x)
 * **Jangan centang "Transcode"** pada kamera RTSP: encoding H.264 di CPU STB sangat berat. Kamera H.265 butuh transcode, jadi pakai sumber H.264 (substream) bila ada.
 * Upload ISP = batas jumlah penonton bersamaan (1 penonton ≈ 1× bitrate stream).
@@ -236,6 +260,7 @@ Contoh halaman host: `/demo-host.html`.
 
 | Method | Path | Keterangan |
 |---|---|---|
+| GET | `/api/health` | `{ok, version, buildAt, startedAt, uptimeSec}` — dipakai untuk memastikan proses yang berjalan memang build terbaru |
 | GET | `/api/catalog` | Cluster & kamera yang boleh dilihat (header `x-grant` opsional) |
 | POST | `/api/unlock` | `{kind:'cluster'\|'camera', id, code, grant?}` → `{grant}` |
 | POST | `/api/cameras/:id/session` | Validasi akses → `{type,url}` untuk pemutar |
@@ -251,8 +276,8 @@ MEDIAMTX_BIN=/path/mediamtx npm test                      # + RTSP → HLS sungg
 
 ## Catatan keamanan & batasan
 
-* Admin hanya satu tipe peran (administrator); belum ada multi-admin/role.
-* Satu kode per kamera/cluster (dibagikan ke banyak orang). Mencabut akses = ganti kode; grant yang sudah terbit tetap berlaku sampai kedaluwarsa (atur di Pengaturan).
+* Semua admin setara (satu peran); tidak ada peran/izin bertingkat. Tambah, cabut sesi, dan hapus akun lewat tab **Admin**.
+* Satu kode per kamera/cluster (dibagikan ke banyak orang). Grant membawa versi akses, jadi **mencabut akses langsung mematikan grant yang sudah terbit** — tidak perlu menunggu kedaluwarsa. Kedaluwarsa grant tetap bisa diatur di Pengaturan.
 * Admin dipercaya menentukan URL sumber; server akan menarik URL tersebut. Jangan beri akses admin ke pihak yang tidak dipercaya.
 * Rate limit bersifat in-memory (per proses) — gunakan satu instance, atau tambahkan store bersama bila di-scale.
 * Konsumsi bandwidth server = jumlah penonton × bitrate untuk sumber yang diproxy.

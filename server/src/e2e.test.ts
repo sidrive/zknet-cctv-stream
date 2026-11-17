@@ -642,3 +642,22 @@ test('kerangka publik: semua halaman publik memakai AppShell, jadi menu tidak hi
     assert.doesNotMatch(src, /zk-app--plain/, `${f} masih memakai kerangka lama zk-app--plain`)
   }
 })
+
+test('/api/health memuat versi & waktu build, penanda proses lama vs baru', async () => {
+  const h = await api('/api/health')
+  assert.equal(h.status, 200)
+  assert.equal(h.body.ok, true)
+  assert.equal(typeof h.body.version, 'string', 'versi paket harus dikirim')
+  // Saat dijalankan dari sumber (tsx) nilai ini boleh null; kalau ada harus ISO.
+  if (h.body.buildAt !== null) {
+    assert.match(String(h.body.buildAt), /^\d{4}-\d{2}-\d{2}T/, 'waktu build harus ISO')
+    assert.ok(Date.parse(h.body.buildAt) <= Date.now() + 1000)
+  }
+  assert.ok(typeof h.body.startedAt === 'string' && Number(h.body.uptimeSec) >= 0)
+
+  // Endpoint API yang tidak ada tetap pesan generik — frontend yang menerjemahkannya.
+  // (Di bawah /api/admin jawabannya 401 karena middleware login, dan itu memang benar.)
+  const nope = await api('/api/tidak-ada')
+  assert.equal(nope.status, 404)
+  assert.equal(nope.body.error, 'Endpoint tidak ditemukan')
+})

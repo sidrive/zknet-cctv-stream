@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
 import crypto from 'node:crypto'
+import fs from 'node:fs'
 import { z } from 'zod'
 import {
   canWatch, checkCode, cameraOpen, clusterOpen, getCamera, getCluster, grantsFromRequest,
@@ -26,7 +27,32 @@ const unlockLimiter = rateLimit({
   message: { error: 'Terlalu banyak percobaan. Coba lagi sebentar.' },
 })
 
-publicRouter.get('/health', (_req, res) => res.json({ ok: true }))
+/**
+ * Versi & waktu build ikut dikirim supaya kasus "panel bilang endpoint tidak ditemukan"
+ * bisa langsung didiagnosis: biasanya proses yang berjalan masih build lama
+ * (git pull sudah, PM2 belum restart). Bandingkan `buildAt` dengan commit terakhir.
+ */
+const BUILD_AT = (() => {
+  // dist (produksi) memakai .js; tes menjalankan sumber .ts lewat tsx.
+  for (const f of ['./publicRoutes.js', './publicRoutes.ts']) {
+    try { return fs.statSync(new URL(f, import.meta.url)).mtime.toISOString() } catch { /* coba berikutnya */ }
+  }
+  return null
+})()
+const VERSION = (() => {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version?: string }
+    return pkg.version ?? null
+  } catch { return null }
+})()
+
+publicRouter.get('/health', (_req, res) => res.json({
+  ok: true,
+  version: VERSION,
+  buildAt: BUILD_AT,
+  startedAt: new Date(startedAt).toISOString(),
+  uptimeSec: Math.round((Date.now() - startedAt) / 1000),
+}))
 
 /**
  * Ringkasan kesehatan sistem untuk kartu "Layanan ZKNet" dan halaman Status Jaringan.

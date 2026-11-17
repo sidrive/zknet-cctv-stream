@@ -15,6 +15,21 @@ export const setGrant = (g: string) => {
 let memoryGrant = ''
 const currentGrant = () => getGrant() || memoryGrant
 
+/**
+ * Pesan "Endpoint tidak ditemukan" dari server hampir selalu berarti proses yang
+ * berjalan masih build lama (git pull sudah, PM2 belum restart) — bukan salah pakai.
+ * Diterjemahkan supaya petugas tahu langkah yang harus dilakukan.
+ */
+function friendlyError(status: number, data: any): string {
+  const raw = String(data?.error ?? '')
+  if (status === 404 && raw === 'Endpoint tidak ditemukan') {
+    return 'Server yang berjalan belum punya fitur ini — biasanya prosesnya masih versi lama. '
+      + 'Jalankan ./deploy/stb-update.sh (atau pm2 restart zknet-cctv), lalu muat ulang halaman. '
+      + 'Cek versi server di /api/health.'
+  }
+  return raw || `Error ${status}`
+}
+
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = {}
   if (method !== 'GET') headers['content-type'] = 'application/json'
@@ -27,7 +42,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
     body: method === 'GET' ? undefined : JSON.stringify(body ?? {}),
   })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new ApiError(res.status, data?.error || `Error ${res.status}`, data)
+  if (!res.ok) throw new ApiError(res.status, friendlyError(res.status, data), data)
   return data as T
 }
 

@@ -212,10 +212,11 @@ const SOURCE_HELP: Record<string, string> = {
 function Cameras({ cameras, clusters, reload }: { cameras: AdminCamera[]; clusters: AdminCluster[]; reload: () => void }) {
   const [editing, setEditing] = useState<AdminCamera | 'new' | null>(null)
   const [preview, setPreview] = useState<AdminCamera | null>(null)
+  const [msg, setMsg] = useState('')
   const clusterName = (id: string | null) => clusters.find((c) => c.id === id)?.name ?? '—'
   const remove = async (c: AdminCamera) => {
     if (!confirm(`Hapus kamera "${c.name}"?`)) return
-    await admin.deleteCamera(c.id); reload()
+    try { await admin.deleteCamera(c.id); setMsg(''); reload() } catch (e) { setMsg(errMsg(e)) }
   }
 
   // Geser satu langkah di dalam cluster yang sama. Server menerima seluruh urutan lalu
@@ -227,13 +228,13 @@ function Cameras({ cameras, clusters, reload }: { cameras: AdminCamera[]; cluste
     if (j < 0 || j >= group.length) return
     const ids = group.map((x) => x.id)
     ;[ids[i], ids[j]] = [ids[j], ids[i]]
-    await admin.reorderCameras(ids)
-    reload()
+    try { await admin.reorderCameras(ids); setMsg(''); reload() } catch (e) { setMsg(errMsg(e)) }
   }
 
   return (
     <section>
       <div className="row between"><h2>Kamera</h2><button className="btn btn-primary" onClick={() => setEditing('new')}>+ Tambah kamera</button></div>
+      {msg && <p className="error" role="alert" style={{ margin: '8px 0 0' }}>{msg}</p>}
       <div className="table-wrap">
         <table>
           <thead><tr><th>Nama</th><th>Cluster</th><th className="col-hide-sm">Sumber</th><th>Akses</th><th className="col-hide-sm">Status</th><th /></tr></thead>
