@@ -8,6 +8,7 @@ import { ADMIN_COOKIE, adminFromRequest, requireAdmin, signAdmin } from './auth.
 import { config } from './config.js';
 import { db, EDITABLE_SETTING_KEYS, embedApiKey, getSetting, newId, setSetting } from './db.js';
 import { ffmpeg } from './ffmpeg.js';
+import { decryptCode, encryptCode, generateCode } from './secrets.js';
 export const adminRouter = Router();
 const loginLimiter = rateLimit({
     windowMs: 15 * 60_000,
@@ -100,33 +101,43 @@ const clusterBody = z.object({
 const clusterOut = (c) => ({
     id: c.id, slug: c.slug, name: c.name, description: c.description, sort: c.sort,
     accessMode: c.access_mode, hasCode: !!c.access_hash,
+    // true bila kode tersimpan terenkripsi, jadi admin bisa membacanya lagi untuk dibagikan.
+    // false = kode dibuat sebelum fitur ini ada, atau cuma hash lama.
+    codeViewable: !!c.access_code_enc && !!(c.access_hash),
+    accessVersion: c.access_version ?? 1,
     cameraCount: db.prepare('SELECT COUNT(*) n FROM cameras WHERE cluster_id = ?').get(c.id).n,
 });
 adminRouter.get('/clusters', (_req, res) => {
     const rows = db.prepare('SELECT * FROM clusters ORDER BY sort, name').all();
     res.json(rows.map(clusterOut));
 });
-function resolveHash(mode, code, oldHash) {
+/**
+ * Menghasilkan hash (verifikasi) DAN ciphertext (untuk ditampilkan ke admin).
+ * - Kode baru diberikan      -> hash + enkripsi baru.
+ * - Edit tanpa kode baru     -> hash & ciphertext lama dipertahankan.
+ * - Pindah ke publik         -> keduanya dikosongkan.
+ */
+function resolveCode(mode, code, old) {
     if (mode === 'public')
-        return { hash: null };
+        return { hash: null, enc: null };
     if (code)
-        return { hash: hashCode(code) };
-    if (oldHash)
-        return { hash: oldHash };
+        return { hash: hashCode(code), enc: encryptCode(code) };
+    if (old.access_hash)
+        return { hash: old.access_hash, enc: old.access_code_enc };
     return { error: 'Kode akses wajib diisi untuk akses terproteksi' };
 }
 adminRouter.post('/clusters', (req, res) => {
     const p = clusterBody.safeParse(req.body);
     if (!p.success)
         return res.status(400).json({ error: p.error.issues[0].message });
-    const h = resolveHash(p.data.accessMode, p.data.accessCode, null);
+    const h = resolveCode(p.data.accessMode, p.data.accessCode, { access_hash: null, access_code_enc: null });
     if ('error' in h)
         return res.status(400).json({ error: h.error });
     if (db.prepare('SELECT 1 FROM clusters WHERE slug = ?').get(p.data.slug)) {
         return res.status(409).json({ error: 'Slug sudah dipakai' });
     }
     const id = newId();
-    db.prepare('INSERT INTO clusters(id,slug,name,description,access_mode,access_hash,sort) VALUES(?,?,?,?,?,?,?)').run(id, p.data.slug, p.data.name, p.data.description, p.data.accessMode, h.hash, p.data.sort);
+    db.prepare('INSERT INTO clusters(id,slug,name,description,access_mode,access_hash,access_code_enc,sort) VALUES(?,?,?,?,?,?,?,?)').run(id, p.data.slug, p.data.name, p.data.description, p.data.accessMode, h.hash, h.enc, p.data.sort);
     res.status(201).json(clusterOut(db.prepare('SELECT * FROM clusters WHERE id = ?').get(id)));
 });
 adminRouter.put('/clusters/:id', (req, res) => {
@@ -136,13 +147,13 @@ adminRouter.put('/clusters/:id', (req, res) => {
     const p = clusterBody.safeParse(req.body);
     if (!p.success)
         return res.status(400).json({ error: p.error.issues[0].message });
-    const h = resolveHash(p.data.accessMode, p.data.accessCode, old.access_hash);
+    const h = resolveCode(p.data.accessMode, p.data.accessCode, old);
     if ('error' in h)
         return res.status(400).json({ error: h.error });
     const dup = db.prepare('SELECT id FROM clusters WHERE slug = ? AND id != ?').get(p.data.slug, old.id);
     if (dup)
         return res.status(409).json({ error: 'Slug sudah dipakai' });
-    db.prepare('UPDATE clusters SET slug=?,name=?,description=?,access_mode=?,access_hash=?,sort=? WHERE id=?').run(p.data.slug, p.data.name, p.data.description, p.data.accessMode, h.hash, p.data.sort, old.id);
+    db.prepare('UPDATE clusters SET slug=?,name=?,description=?,access_mode=?,access_hash=?,access_code_enc=?,sort=? WHERE id=?').run(p.data.slug, p.data.name, p.data.description, p.data.accessMode, h.hash, h.enc, p.data.sort, old.id);
     res.json(clusterOut(db.prepare('SELECT * FROM clusters WHERE id = ?').get(old.id)));
 });
 adminRouter.delete('/clusters/:id', (req, res) => {
@@ -152,6 +163,76 @@ adminRouter.delete('/clusters/:id', (req, res) => {
     if (!r.changes)
         return res.status(404).json({ error: 'Cluster tidak ditemukan' });
     res.json({ ok: true });
+});
+// ---------- Kode akses: lihat & cabut ----------
+/**
+ * Mencabut akses = menaikkan access_version. Semua grant (termasuk tautan embed
+ * dan `?grant=` yang sudah dibagikan) langsung tidak berlaku, tanpa menunggu
+ * masa berlaku token habis.
+ *
+ * `rotate` sekaligus mengganti kode. Ini penting: tanpa mengganti kode, orang
+ * yang memegang kode lama bisa langsung unlock lagi dan mendapat grant baru.
+ */
+function revokeAccess(table, id, body) {
+    const row = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
+    if (!row)
+        return { status: 404, body: { error: table === 'clusters' ? 'Cluster tidak ditemukan' : 'Kamera tidak ditemukan' } };
+    if (row.access_mode !== 'protected') {
+        return { status: 400, body: { error: 'Sumber ini publik, tidak ada kode akses untuk dicabut' } };
+    }
+    let code;
+    let hash = row.access_hash;
+    let enc = null;
+    if (body.rotate) {
+        code = body.accessCode?.trim() || generateCode();
+        if (code.length < 4)
+            return { status: 400, body: { error: 'Kode baru minimal 4 karakter' } };
+        hash = hashCode(code);
+        enc = encryptCode(code);
+    }
+    db.prepare(`UPDATE ${table} SET access_version = access_version + 1, access_hash = ?, access_code_enc = ? WHERE id = ?`)
+        .run(hash, enc, id);
+    const after = db.prepare(`SELECT access_version FROM ${table} WHERE id = ?`).get(id);
+    return { status: 200, body: { id, accessVersion: after.access_version, rotated: !!body.rotate, code } };
+}
+const revokeBody = z.object({ rotate: z.boolean().optional(), accessCode: z.string().max(200).optional() });
+adminRouter.get('/clusters/:id/code', (req, res) => {
+    const row = db.prepare('SELECT * FROM clusters WHERE id = ?').get(req.params.id);
+    if (!row)
+        return res.status(404).json({ error: 'Cluster tidak ditemukan' });
+    const code = decryptCode(row.access_code_enc);
+    if (!code) {
+        return res.status(409).json({
+            error: 'Kode ini dibuat sebelum fitur "lihat kode" ada, jadi hanya tersimpan sebagai hash. Ganti kode untuk bisa melihatnya lagi.',
+        });
+    }
+    res.json({ code });
+});
+adminRouter.post('/clusters/:id/revoke', (req, res) => {
+    const p = revokeBody.safeParse(req.body ?? {});
+    if (!p.success)
+        return res.status(400).json({ error: p.error.issues[0].message });
+    const r = revokeAccess('clusters', req.params.id, p.data);
+    res.status(r.status).json(r.body);
+});
+adminRouter.get('/cameras/:id/code', (req, res) => {
+    const row = db.prepare('SELECT * FROM cameras WHERE id = ?').get(req.params.id);
+    if (!row)
+        return res.status(404).json({ error: 'Kamera tidak ditemukan' });
+    const code = decryptCode(row.access_code_enc);
+    if (!code) {
+        return res.status(409).json({
+            error: 'Kode ini dibuat sebelum fitur "lihat kode" ada, jadi hanya tersimpan sebagai hash. Ganti kode untuk bisa melihatnya lagi.',
+        });
+    }
+    res.json({ code });
+});
+adminRouter.post('/cameras/:id/revoke', (req, res) => {
+    const p = revokeBody.safeParse(req.body ?? {});
+    if (!p.success)
+        return res.status(400).json({ error: p.error.issues[0].message });
+    const r = revokeAccess('cameras', req.params.id, p.data);
+    res.status(r.status).json(r.body);
 });
 // ---------- Kamera ----------
 const SCHEMES = {
@@ -187,6 +268,8 @@ const cameraOut = (c) => ({
     clusterId: c.cluster_id, sourceType: c.source_type, sourceUrl: c.source_url,
     proxy: !!c.proxy, transcode: !!c.transcode, listed: !!c.listed, enabled: !!c.enabled, sort: c.sort,
     accessMode: c.access_mode, hasCode: !!c.access_hash,
+    codeViewable: !!c.access_code_enc && !!c.access_hash,
+    accessVersion: c.access_version ?? 1,
     lat: c.lat ?? null, lng: c.lng ?? null,
 });
 adminRouter.get('/cameras', (_req, res) => {
@@ -203,12 +286,12 @@ adminRouter.post('/cameras', (req, res) => {
     const d = p.data;
     if (!clusterExists(d.clusterId))
         return res.status(400).json({ error: 'Cluster tidak ditemukan' });
-    const h = resolveHash(d.accessMode, d.accessCode, null);
+    const h = resolveCode(d.accessMode, d.accessCode, { access_hash: null, access_code_enc: null });
     if ('error' in h)
         return res.status(400).json({ error: h.error });
     const id = newId();
-    db.prepare(`INSERT INTO cameras(id,name,description,location,cluster_id,source_type,source_url,proxy,transcode,access_mode,access_hash,listed,enabled,sort,lat,lng)
-     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, d.name, d.description, d.location, d.clusterId, d.sourceType, d.sourceUrl, +d.proxy, +d.transcode, d.accessMode, h.hash, +d.listed, +d.enabled, d.sort, d.lat, d.lng);
+    db.prepare(`INSERT INTO cameras(id,name,description,location,cluster_id,source_type,source_url,proxy,transcode,access_mode,access_hash,access_code_enc,listed,enabled,sort,lat,lng)
+     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, d.name, d.description, d.location, d.clusterId, d.sourceType, d.sourceUrl, +d.proxy, +d.transcode, d.accessMode, h.hash, h.enc, +d.listed, +d.enabled, d.sort, d.lat, d.lng);
     res.status(201).json(cameraOut(db.prepare('SELECT * FROM cameras WHERE id = ?').get(id)));
 });
 adminRouter.put('/cameras/:id', (req, res) => {
@@ -221,11 +304,11 @@ adminRouter.put('/cameras/:id', (req, res) => {
     const d = p.data;
     if (!clusterExists(d.clusterId))
         return res.status(400).json({ error: 'Cluster tidak ditemukan' });
-    const h = resolveHash(d.accessMode, d.accessCode, old.access_hash);
+    const h = resolveCode(d.accessMode, d.accessCode, old);
     if ('error' in h)
         return res.status(400).json({ error: h.error });
     db.prepare(`UPDATE cameras SET name=?,description=?,location=?,cluster_id=?,source_type=?,source_url=?,proxy=?,transcode=?,
-       access_mode=?,access_hash=?,listed=?,enabled=?,sort=?,lat=?,lng=? WHERE id=?`).run(d.name, d.description, d.location, d.clusterId, d.sourceType, d.sourceUrl, +d.proxy, +d.transcode, d.accessMode, h.hash, +d.listed, +d.enabled, d.sort, d.lat, d.lng, old.id);
+       access_mode=?,access_hash=?,access_code_enc=?,listed=?,enabled=?,sort=?,lat=?,lng=? WHERE id=?`).run(d.name, d.description, d.location, d.clusterId, d.sourceType, d.sourceUrl, +d.proxy, +d.transcode, d.accessMode, h.hash, h.enc, +d.listed, +d.enabled, d.sort, d.lat, d.lng, old.id);
     ffmpeg.stop(old.id); // sumber mungkin berubah -> restart saat ditonton lagi
     res.json(cameraOut(db.prepare('SELECT * FROM cameras WHERE id = ?').get(old.id)));
 });

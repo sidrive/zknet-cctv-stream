@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { z } from 'zod';
 import { canWatch, checkCode, cameraOpen, clusterOpen, getCamera, getCluster, grantsFromRequest, signGrant, parseGrant, emptyGrants, } from './access.js';
 import { adminFromRequest } from './auth.js';
+import { config } from './config.js';
 import { db, embedApiKey, getSetting, PUBLIC_SETTING_KEYS } from './db.js';
 import { ffmpeg } from './ffmpeg.js';
 import { getAllProbes, lastCheckAt, refreshProbes } from './health.js';
@@ -12,7 +13,7 @@ export const publicRouter = Router();
 const startedAt = Date.now();
 const unlockLimiter = rateLimit({
     windowMs: 60_000,
-    limit: 10,
+    limit: config.unlockRateLimit,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Terlalu banyak percobaan. Coba lagi sebentar.' },
@@ -132,10 +133,11 @@ publicRouter.post('/unlock', unlockLimiter, (req, res) => {
     if (!ok || !target)
         return res.status(403).json({ error: 'Kode salah' });
     const g = parseGrant(grant);
+    // Simpan versi akses saat ini: kalau admin mencabut akses, grant ini mati.
     if (kind === 'cluster')
-        g.clusters.add(target.id);
+        g.clusters.set(target.id, target.access_version ?? 1);
     else
-        g.cameras.add(target.id);
+        g.cameras.set(target.id, target.access_version ?? 1);
     res.json({ grant: signGrant(g) });
 });
 // Minta sesi tonton: server memvalidasi akses lalu memberi token stream.
@@ -188,13 +190,13 @@ publicRouter.post('/embed/grant', (req, res) => {
         const row = getCluster(c);
         if (!row)
             return res.status(404).json({ error: `Cluster tidak ditemukan: ${c}` });
-        g.clusters.add(row.id);
+        g.clusters.set(row.id, row.access_version ?? 1);
     }
     for (const c of p.data.cameras) {
         const row = getCamera(c);
         if (!row)
             return res.status(404).json({ error: `Kamera tidak ditemukan: ${c}` });
-        g.cameras.add(row.id);
+        g.cameras.set(row.id, row.access_version ?? 1);
     }
     res.json({ grant: signGrant(g, p.data.ttlMinutes * 60) });
 });

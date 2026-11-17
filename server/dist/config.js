@@ -20,4 +20,7 @@ export const config = {
     probeCacheSeconds: Number(env.PROBE_CACHE_SECONDS ?? 60),
     probeTimeoutMs: Number(env.PROBE_TIMEOUT_MS ?? 4000),
     probeConcurrency: Math.max(1, Number(env.PROBE_CONCURRENCY ?? 5)),
+    // Batas percobaan kode akses per IP per menit (anti tebak kode). Naikkan hanya
+    // bila benar-benar perlu, mis. pada lingkungan uji otomatis.
+    unlockRateLimit: Math.max(1, Number(env.UNLOCK_RATE_LIMIT ?? 10)),
 };
