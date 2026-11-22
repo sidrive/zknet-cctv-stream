@@ -4,10 +4,12 @@ import { codeEncKey } from './db.js'
 /**
  * Enkripsi kode akses supaya admin bisa melihatnya lagi untuk dibagikan.
  *
- * Kenapa tidak disimpan sebagai teks biasa: database berisi URL & kredensial
- * kamera dan sering di-copy antar mesin (lihat deploy/stb-restore-db.sh). Dengan
- * AES-GCM, file database yang bocor sendirian tidak membuka kode akses — kuncinya
- * ada di tabel settings dan sengaja tidak ikut tercetak di endpoint mana pun.
+ * PERHATIAN (batas perlindungan): kunci enkripsi disimpan di tabel `settings` pada database
+ * YANG SAMA. Jadi enkripsi ini hanya mencegah kode terbaca sekilas (mis. lewat `sqlite3` atau
+ * log), BUKAN melindungi dari orang yang memegang salinan file database (backup, `scp`,
+ * db:export): pemegang file itu bisa membaca kunci dan mendekripsi semua kode. Perlakukan file
+ * database dan backup-nya sebagai rahasia. Perlindungan sungguhan butuh kunci di luar database
+ * (mis. variabel environment), yang berarti kunci itu harus ikut dipindahkan saat pindah server.
  *
  * Kenapa tidak cukup hash: hash satu arah, sehingga kode lama tidak mungkin
  * ditampilkan kembali. Verifikasi tetap memakai hash (bcrypt, lihat access.ts),

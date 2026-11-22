@@ -4,6 +4,7 @@ import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
+import net from 'node:net'
 import path from 'node:path'
 import { rewriteM3u8 } from './streams.js'
 
@@ -61,7 +62,7 @@ before(async () => {
   fs.writeFileSync(path.join(webDir, 'asset.js'), 'console.log(1)')
 
   server = spawn(process.execPath, ['--import', 'tsx', 'src/index.ts'], {
-    env: { ...process.env, PORT: String(PORT), DATA_DIR: path.join(tmp, 'data'), STREAM_TMP_DIR: path.join(tmp, 'ff'), WEB_DIR: webDir, UNLOCK_RATE_LIMIT: '1000' },
+    env: { ...process.env, PORT: String(PORT), DATA_DIR: path.join(tmp, 'data'), STREAM_TMP_DIR: path.join(tmp, 'ff'), WEB_DIR: webDir, UNLOCK_RATE_LIMIT: '1000', PROBE_REFRESH_COOLDOWN_SECONDS: '2' },
     stdio: 'ignore',
   })
   for (let i = 0; i < 60; i++) {
@@ -660,4 +661,72 @@ test('/api/health memuat versi & waktu build, penanda proses lama vs baru', asyn
   const nope = await api('/api/tidak-ada')
   assert.equal(nope.status, 404)
   assert.equal(nope.body.error, 'Endpoint tidak ditemukan')
+})
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+test('probe: RTSP/RTMP dicek lewat TCP, SRT "unknown"; /health/detail tidak membocorkan kamera tersembunyi', async () => {
+  // "Kamera RTSP" yang benar-benar menjawab di TCP (bukan server RTSP sungguhan: cukup port terbuka).
+  const rtspUp = net.createServer((s) => s.destroy()).listen(18141, '127.0.0.1')
+  try {
+    const mkCluster = async (o: object) => (await api('/api/admin/clusters', { method: 'POST', admin: true, json: o })).body.id as string
+    const open = await mkCluster({ name: 'Probe Terbuka', slug: 'probe-terbuka' })
+    const locked = await mkCluster({ name: 'Probe Terkunci', slug: 'probe-terkunci', accessMode: 'protected', accessCode: 'kunci-9' })
+    const mk = async (o: object) => {
+      const r = await api('/api/admin/cameras', { method: 'POST', admin: true, json: o })
+      assert.equal(r.status, 201, JSON.stringify(r.body))
+      return r.body.id as string
+    }
+    const dead = 'http://127.0.0.1:18142/mati.m3u8'
+    const rtspOnline = await mk({ name: 'RTSP Hidup', sourceType: 'rtsp', sourceUrl: 'rtsp://user:pw@127.0.0.1:18141/live', clusterId: open })
+    const rtspOffline = await mk({ name: 'RTSP Mati', sourceType: 'rtsp', sourceUrl: 'rtsp://127.0.0.1:18142/live', clusterId: open })
+    const srt = await mk({ name: 'SRT Kamera', sourceType: 'rtsp', sourceUrl: 'srt://127.0.0.1:18143', clusterId: open })
+    const teaser = await mk({ name: 'Berkode Pemikat', sourceType: 'hls', sourceUrl: dead, clusterId: open, accessMode: 'protected', accessCode: 'abc12345' })
+    const unlisted = await mk({ name: 'TAK TERDAFTAR RAHASIA', sourceType: 'hls', sourceUrl: dead, clusterId: open, listed: false })
+    const inLocked = await mk({ name: 'DALAM CLUSTER TERKUNCI', sourceType: 'hls', sourceUrl: dead, clusterId: locked })
+
+    await sleep(2100) // lewati cooldown "Cek ulang" dari tes sebelumnya
+    const r = await api('/api/health/refresh', { method: 'POST', json: {} })
+    assert.equal(r.body.throttled, false)
+
+    const status = (await api('/api/catalog')).body.cameras as { id: string; status: string }[]
+    const st = (id: string) => status.find((c) => c.id === id)?.status
+    assert.equal(st(rtspOnline), 'online', 'RTSP yang TCP-nya terbuka harus online (fetch() tidak mengenal rtsp://)')
+    assert.equal(st(rtspOffline), 'offline')
+    assert.equal(st(srt), 'unknown', 'SRT (UDP) tidak bisa dicek: unknown, bukan offline')
+
+    // Publik: kamera berkode di cluster terbuka TETAP tampil (pemikat), yang tersembunyi tidak.
+    const pub = JSON.stringify((await api('/api/health/detail')).body)
+    assert.ok(pub.includes('Berkode Pemikat'), 'kamera berkode di cluster terbuka sengaja ditampilkan')
+    assert.ok(!pub.includes('TAK TERDAFTAR') && !pub.includes(unlisted), 'kamera tak terdaftar bocor lewat /health/detail')
+    assert.ok(!pub.includes('DALAM CLUSTER TERKUNCI') && !pub.includes(inLocked), 'kamera di cluster terkunci bocor')
+    assert.ok(!pub.includes('pw@'), 'kredensial sumber tidak boleh muncul')
+
+    // Hitungan konsisten dengan daftar yang terlihat (tidak ada selisih "offline 5, daftar 3").
+    const d = (await api('/api/health/detail')).body
+    assert.equal(d.cameras.offline, d.problems.length)
+
+    // Admin melihat semuanya.
+    const adm = JSON.stringify((await api('/api/health/detail', { admin: true })).body)
+    assert.ok(adm.includes('TAK TERDAFTAR RAHASIA') && adm.includes('DALAM CLUSTER TERKUNCI'))
+
+    // Setelah cluster dibuka lewat kode, kameranya ikut terlihat oleh pemegang grant.
+    const g = (await api('/api/unlock', { method: 'POST', json: { kind: 'cluster', id: locked, code: 'kunci-9' } })).body.grant
+    const withGrant = JSON.stringify((await api('/api/health/detail', { grant: g })).body)
+    assert.ok(withGrant.includes('DALAM CLUSTER TERKUNCI'))
+  } finally {
+    rtspUp.close()
+  }
+})
+
+test('POST /health/refresh dibatasi cooldown (publik, tanpa login)', async () => {
+  await sleep(2100)
+  const a = await api('/api/health/refresh', { method: 'POST', json: {} })
+  const b = await api('/api/health/refresh', { method: 'POST', json: {} })
+  assert.equal(a.status, 200)
+  assert.equal(a.body.throttled, false)
+  assert.equal(b.status, 200)
+  assert.equal(b.body.throttled, true, 'panggilan beruntun harus ditahan, bukan memicu probe ulang')
+  await sleep(2100)
+  assert.equal((await api('/api/health/refresh', { method: 'POST', json: {} })).body.throttled, false, 'setelah cooldown boleh lagi')
 })

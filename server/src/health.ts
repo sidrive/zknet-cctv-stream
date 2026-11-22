@@ -11,7 +11,14 @@
  * - Dibatasi beberapa permintaan paralel sekaligus agar STB tidak kewalahan.
  * - Tidak mengikuti redirect dan tidak membaca body: hanya memastikan sumber
  *   menjawab (status < 400). Segmen video tidak diunduh.
+ * - Cara cek bergantung skema URL sumber:
+ *     http(s)               -> HTTP GET (status < 400 = online)
+ *     rtsp/rtsps/rtmp/rtmps -> sambung TCP ke host:port (fetch() Node tidak mengenal skema ini).
+ *                              "online" berarti server kamera terjangkau, BUKAN bahwa stream-nya
+ *                              pasti bisa diputar (itu baru terbukti saat ditonton).
+ *     srt (UDP) dan lainnya -> "unknown": tidak ada cara murah untuk memastikan dari sini.
  */
+import net from 'node:net'
 import { config } from './config.js'
 import { db } from './db.js'
 import type { CameraRow } from './access.js'
@@ -45,8 +52,35 @@ export function lastCheckAt(): number | null {
   return lastFullRun
 }
 
+const TCP_DEFAULT_PORT: Record<string, number> = { 'rtsp:': 554, 'rtsps:': 322, 'rtmp:': 1935, 'rtmps:': 443 }
+
+function protocolOf(raw: string): string {
+  try { return new URL(raw).protocol } catch { return '' }
+}
+
+function tcpProbe(raw: string, started: number): Promise<HealthProbe> {
+  return new Promise((resolve) => {
+    const result = (status: CameraStatus): HealthProbe => ({ status, checkedAt: Date.now(), latencyMs: Date.now() - started })
+    let u: URL
+    try { u = new URL(raw) } catch { return resolve(result('offline')) }
+    const port = Number(u.port) || TCP_DEFAULT_PORT[u.protocol]
+    const host = u.hostname.replace(/^\[|\]$/g, '') // IPv6 literal: [::1] -> ::1
+    if (!host || !port) return resolve(result('offline'))
+    const sock = net.connect({ host, port })
+    const finish = (status: CameraStatus) => { sock.destroy(); resolve(result(status)) }
+    sock.setTimeout(config.probeTimeoutMs, () => finish('offline'))
+    sock.once('connect', () => finish('online'))
+    sock.once('error', () => finish('offline'))
+  })
+}
+
 async function probeOne(cam: CameraRow): Promise<HealthProbe> {
   const started = Date.now()
+  const proto = protocolOf(cam.source_url)
+  if (proto in TCP_DEFAULT_PORT) return tcpProbe(cam.source_url, started)
+  if (proto !== 'http:' && proto !== 'https:') {
+    return { status: 'unknown', checkedAt: Date.now(), latencyMs: null }
+  }
   try {
     const ac = new AbortController()
     const timer = setTimeout(() => ac.abort(), config.probeTimeoutMs)

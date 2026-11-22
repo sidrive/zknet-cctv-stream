@@ -64,8 +64,8 @@ ensureColumn('cameras', 'lng', 'REAL');
 ensureColumn('clusters', 'access_version', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumn('cameras', 'access_version', 'INTEGER NOT NULL DEFAULT 1');
 // Kode akses terenkripsi (AES-256-GCM) supaya admin bisa membacanya lagi untuk dibagikan.
-// access_hash tetap dipakai untuk verifikasi, jadi database bocor tanpa kunci env tidak
-// langsung membuka semua kode.
+// access_hash tetap dipakai untuk verifikasi. CATATAN: kuncinya ada di tabel settings pada
+// database yang sama (lihat codeEncKey), jadi file database/backup tetap harus dijaga sebagai rahasia.
 ensureColumn('clusters', 'access_code_enc', 'TEXT');
 ensureColumn('cameras', 'access_code_enc', 'TEXT');
 // Manajemen admin: kapan terakhir login, dan versi token untuk "keluarkan semua sesi".

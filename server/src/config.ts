@@ -21,6 +21,8 @@ export const config = {
   // Probe kesehatan sumber kamera (online/offline). Set 0 untuk mematikan.
   probeCacheSeconds: Number(env.PROBE_CACHE_SECONDS ?? 60),
   probeTimeoutMs: Number(env.PROBE_TIMEOUT_MS ?? 4000),
+  // Jeda minimum antar "Cek ulang" paksa (tombol di halaman Status). Anti banjir probe ke semua kamera.
+  probeRefreshCooldownSeconds: Math.max(0, Number(env.PROBE_REFRESH_COOLDOWN_SECONDS ?? 30)),
   probeConcurrency: Math.max(1, Number(env.PROBE_CONCURRENCY ?? 5)),
   // Batas percobaan kode akses per IP per menit (anti tebak kode). Naikkan hanya
   // bila benar-benar perlu, mis. pada lingkungan uji otomatis.

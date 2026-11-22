@@ -59,16 +59,19 @@ publicRouter.get('/health', (_req, res) => res.json({
  * Angka online/offline berasal dari probe latar belakang (lihat health.ts); bila belum
  * pernah diprobe, statusnya "unknown" — jangan ditampilkan sebagai hijau.
  */
-publicRouter.get('/health/detail', (_req, res) => {
-  const rows = db
-    .prepare('SELECT id, name, cluster_id, source_type, enabled FROM cameras')
-    .all() as Pick<CameraRow, 'id' | 'name' | 'cluster_id' | 'source_type' | 'enabled'>[]
+publicRouter.get('/health/detail', (req, res) => {
+  // Visibilitas SAMA dengan katalog: kamera tak terdaftar (listed=0) dan kamera di cluster yang
+  // belum dibuka tidak boleh muncul (nama maupun ID), sebab ID itulah pelindung "hanya via link".
+  // Kamera berkode di cluster terbuka tetap tampil (sengaja, sebagai pemikat).
+  const g = adminFromRequest(req) ? null : grantsFromRequest(req)
+  const clusters = new Map((db.prepare('SELECT * FROM clusters').all() as ClusterRow[]).map((c) => [c.id, c]))
+  const rows = (db
+    .prepare('SELECT id, name, cluster_id, source_type, enabled, listed FROM cameras WHERE enabled = 1')
+    .all() as Pick<CameraRow, 'id' | 'name' | 'cluster_id' | 'source_type' | 'enabled' | 'listed'>[])
+    .filter((cam) => g === null || (cam.listed && clusterOpen(cam.cluster_id ? clusters.get(cam.cluster_id) : undefined, g)))
   const probes = getAllProbes()
   const counts: Record<CameraStatus, number> = { online: 0, offline: 0, unknown: 0 }
-  for (const cam of rows) {
-    const s = cam.enabled ? (probes[cam.id]?.status ?? 'unknown') : 'unknown'
-    counts[s === 'offline' ? 'offline' : s === 'online' ? 'online' : 'unknown']++
-  }
+  for (const cam of rows) counts[probes[cam.id]?.status ?? 'unknown']++
   const problems = rows
     .filter((cam) => probes[cam.id]?.status === 'offline')
     .map((cam) => ({ id: cam.id, name: cam.name, checkedAt: probes[cam.id]!.checkedAt }))
@@ -76,18 +79,29 @@ publicRouter.get('/health/detail', (_req, res) => {
   res.json({
     ok: counts.offline === 0 || counts.online > 0,
     uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
-    cameras: { total: rows.length, enabled: rows.filter((c) => c.enabled).length, ...counts },
-    clusters: (db.prepare('SELECT COUNT(*) n FROM clusters').get() as { n: number }).n,
+    cameras: { total: rows.length, enabled: rows.length, ...counts },
+    clusters: clusters.size,
     transcoders: ffmpeg.activeCount(),
     lastCheckAt: lastCheckAt(),
     problems,
   })
 })
 
-/** Picu probe segera (dipakai tombol "Cek ulang" di halaman Status). */
+/**
+ * Picu probe segera (tombol "Cek ulang" di halaman Status). Endpoint ini publik, jadi dibatasi:
+ * paling sering sekali per `probeRefreshCooldownSeconds` (global), dan respons tidak menunggu
+ * lebih dari 10 detik (probe tetap berjalan di latar belakang) agar tidak kena timeout proxy.
+ * Tanpa batas ini siapa pun bisa memaksa STB memukul semua sumber kamera terus-menerus.
+ */
+let lastForcedRefresh = 0
 publicRouter.post('/health/refresh', async (_req, res) => {
-  await refreshProbes(true)
-  res.json({ ok: true, lastCheckAt: lastCheckAt() })
+  const now = Date.now()
+  const throttled = now - lastForcedRefresh < config.probeRefreshCooldownSeconds * 1000
+  if (!throttled) {
+    lastForcedRefresh = now
+    await Promise.race([refreshProbes(true), new Promise((r) => setTimeout(r, 10_000))])
+  }
+  res.json({ ok: true, throttled, lastCheckAt: lastCheckAt() })
 })
 
 
